@@ -332,7 +332,12 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       [taskRes.rows[0].reward_points, req.userId]
     );
 
-
+   // 🧾 تسجيل التاسك في Task History
+await pool.query(
+  `INSERT INTO user_tasks (user_id, task_id, task_type, points)
+   VALUES ($1, $2, 'ad', $3)`,
+  [req.userId, taskId, rewardPoints]
+);
 
     // ✅ تسجيل إن المستخدم شاف الإعلان
 await pool.query(
