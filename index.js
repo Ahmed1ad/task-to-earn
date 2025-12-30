@@ -17,6 +17,27 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+
+
+// ✅ إنشاء جدول منع تكرار مشاهدة الإعلانات (مرة واحدة)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_ad_views (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        ad_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_id, ad_id)
+      )
+    `);
+    console.log('user_ad_views table ready ✅');
+  } catch (err) {
+    console.error('Error creating user_ad_views table', err);
+  }
+})();
+
+
 // ==============================
 // Helpers
 // ==============================
@@ -289,6 +310,14 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       [taskRes.rows[0].reward_points, req.userId]
     );
 
+
+
+    // ✅ تسجيل إن المستخدم شاف الإعلان
+await pool.query(
+  'INSERT INTO user_ad_views (user_id, ad_id) VALUES ($1, $2)',
+  [req.userId, taskId]
+);
+
     await pool.query(
   `INSERT INTO points_history (user_id, action, points, related_id)
    VALUES ($1, 'watch_ad', $2, $3)`,
@@ -300,6 +329,22 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
+
+
+// 🚫 منع تكرار نفس الإعلان
+const alreadyCompleted = await pool.query(
+  'SELECT id FROM user_ad_views WHERE user_id=$1 AND ad_id=$2',
+  [req.userId, taskId]
+);
+
+if (alreadyCompleted.rows.length > 0) {
+  return res.status(400).json({
+    status: 'error',
+    message: 'Ad already completed'
+  });
+}
+
+  
 });
 
 
