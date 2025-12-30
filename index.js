@@ -43,6 +43,25 @@ function authMiddleware(req, res, next) {
   }
 }
 
+
+
+function adminMiddleware(req, res, next) {
+  const ADMIN_EMAIL = 'ad45821765@gmail.com'; // غيّرها بإيميلك
+
+  pool.query(
+    'SELECT email FROM users WHERE id=$1',
+    [req.userId]
+  ).then(result => {
+    if (result.rows[0].email !== ADMIN_EMAIL) {
+      return res.status(403).json({ status: 'error', message: 'Admin only' });
+    }
+    next();
+  }).catch(() => {
+    res.status(500).json({ status: 'error', message: 'Admin check failed' });
+  });
+}
+
+
 // ==============================
 // Create Tables
 // ==============================
@@ -358,6 +377,47 @@ app.post('/withdraw/request', authMiddleware, async (req, res) => {
 
 
 
+
+app.post('/admin/withdrawals/:id/action', authMiddleware, adminMiddleware, async (req, res) => {
+  const { action } = req.body; // approve | reject
+  const { id } = req.params;
+
+  if (!['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid action' });
+  }
+
+  const wd = await pool.query(
+    'SELECT user_id, amount_points, status FROM withdrawals WHERE id=$1',
+    [id]
+  );
+
+  if (!wd.rows.length || wd.rows[0].status !== 'pending') {
+    return res.status(400).json({ status: 'error', message: 'Invalid withdrawal' });
+  }
+
+  if (action === 'reject') {
+    // رجّع النقاط
+    await pool.query(
+      'UPDATE users SET points = points + $1 WHERE id=$2',
+      [wd.rows[0].amount_points, wd.rows[0].user_id]
+    );
+
+    await pool.query(
+      `INSERT INTO points_history (user_id, action, points)
+       VALUES ($1, 'withdraw_rejected', $2)`,
+      [wd.rows[0].user_id, wd.rows[0].amount_points]
+    );
+  }
+
+  await pool.query(
+    'UPDATE withdrawals SET status=$1 WHERE id=$2',
+    [action === 'approve' ? 'approved' : 'rejected', id]
+  );
+
+  res.json({ status: 'success', message: `Withdrawal ${action}d` });
+});
+
+
 app.get('/withdraw/my', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
@@ -379,6 +439,22 @@ app.get('/withdraw/my', authMiddleware, async (req, res) => {
     });
   }
 });
+
+
+
+
+app.get('/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT w.id, u.username, w.amount_points, w.method, w.wallet_or_number,
+            w.status, w.created_at
+     FROM withdrawals w
+     JOIN users u ON u.id = w.user_id
+     ORDER BY w.created_at DESC`
+  );
+
+  res.json({ status: 'success', withdrawals: result.rows });
+});
+
 
 
 
