@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const app = express();
@@ -19,7 +20,14 @@ const pool = new Pool({
 });
 
 // ==============================
-// Create Users Table (once)
+// Helpers
+// ==============================
+function generateReferralCode() {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
+// ==============================
+// Create Users Table
 // ==============================
 async function createUsersTable() {
   const query = `
@@ -46,7 +54,7 @@ async function createUsersTable() {
 }
 
 // ==============================
-// Basic Routes
+// Routes
 // ==============================
 app.get('/', (req, res) => {
   res.json({
@@ -55,9 +63,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// ==============================
-// Database Health Check
-// ==============================
 app.get('/health/db', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
@@ -75,11 +80,72 @@ app.get('/health/db', async (req, res) => {
 });
 
 // ==============================
+// Register
+// ==============================
+app.post('/auth/register', async (req, res) => {
+  const { username, email, password, referral_code } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'All fields are required'
+    });
+  }
+
+  try {
+    const exists = await pool.query(
+      'SELECT id FROM users WHERE email=$1 OR username=$2',
+      [email, username]
+    );
+
+    if (exists.rows.length > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Username or email already exists'
+      });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const myReferralCode = generateReferralCode();
+
+    let referredBy = null;
+    if (referral_code) {
+      const refUser = await pool.query(
+        'SELECT id FROM users WHERE referral_code=$1',
+        [referral_code]
+      );
+      if (refUser.rows.length > 0) {
+        referredBy = refUser.rows[0].id;
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO users 
+       (username, email, password_hash, referral_code, referred_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [username, email, password_hash, myReferralCode, referredBy]
+    );
+
+    res.json({
+      status: 'success',
+      message: 'User registered successfully'
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Registration failed',
+      error: error.message
+    });
+  }
+});
+
+// ==============================
 // Start Server
 // ==============================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  createUsersTable(); // run once on start
+  createUsersTable();
 });
