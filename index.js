@@ -38,28 +38,6 @@ const pool = new Pool({
 })();
 
 
-
-// ✅ إنشاء جدول Task History (مرة واحدة)
-(async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_tasks (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        task_id INTEGER NOT NULL,
-        task_type VARCHAR(50) NOT NULL,
-        points INTEGER NOT NULL,
-        status VARCHAR(20) DEFAULT 'completed',
-        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    console.log('user_tasks table ready ✅');
-  } catch (err) {
-    console.error('Error creating user_tasks table', err);
-  }
-})();
-
-
 // ==============================
 // Helpers
 // ==============================
@@ -524,16 +502,20 @@ app.get('/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) 
 
 app.get('/tasks/my', authMiddleware, async (req, res) => {
   const result = await pool.query(
-    `SELECT 
-       ut.task_id,
-       ut.task_type,
-       ut.points,
-       ut.status,
-       ut.started_at,
-       ut.completed_at
-     FROM user_tasks ut
-     WHERE ut.user_id = $1
-     ORDER BY ut.started_at DESC`,
+    `
+    SELECT 
+      ut.task_id,
+      t.title,
+      t.task_type,
+      t.reward_points,
+      ut.status,
+      ut.started_at,
+      ut.completed_at
+    FROM user_tasks ut
+    JOIN tasks t ON t.id = ut.task_id
+    WHERE ut.user_id = $1
+    ORDER BY ut.started_at DESC
+    `,
     [req.userId]
   );
 
