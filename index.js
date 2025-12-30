@@ -522,6 +522,28 @@ app.get('/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) 
 
 
 
+app.get('/tasks/my', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT 
+       ut.task_id,
+       ut.task_type,
+       ut.points,
+       ut.status,
+       ut.started_at,
+       ut.completed_at
+     FROM user_tasks ut
+     WHERE ut.user_id = $1
+     ORDER BY ut.started_at DESC`,
+    [req.userId]
+  );
+
+  res.json({
+    status: 'success',
+    tasks: result.rows
+  });
+});
+
+
 
 // ==============================
 // Start Server
