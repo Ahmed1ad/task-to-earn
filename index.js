@@ -305,19 +305,13 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
 
 
 
-
 app.post('/withdraw/request', authMiddleware, async (req, res) => {
   const { amount_points, method, wallet_or_number } = req.body;
-
-  const MIN_WITHDRAW_POINTS = 10; // غيّرها براحتك
+  const MIN_WITHDRAW_POINTS = 50;
 
   if (!amount_points || !method || !wallet_or_number) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'All fields are required'
-    });
+    return res.status(400).json({ status: 'error', message: 'All fields are required' });
   }
-
   if (amount_points < MIN_WITHDRAW_POINTS) {
     return res.status(400).json({
       status: 'error',
@@ -325,53 +319,46 @@ app.post('/withdraw/request', authMiddleware, async (req, res) => {
     });
   }
 
+  const client = await pool.connect();
   try {
-    // هات رصيد المستخدم
-    const userRes = await pool.query(
-      'SELECT points FROM users WHERE id=$1',
+    await client.query('BEGIN');
+
+    const userRes = await client.query(
+      'SELECT points FROM users WHERE id=$1 FOR UPDATE',
       [req.userId]
     );
 
-    const userPoints = userRes.rows[0].points;
-
-    if (userPoints < amount_points) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Insufficient points'
-      });
+    if (userRes.rows[0].points < amount_points) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ status: 'error', message: 'Insufficient points' });
     }
 
-    // خصم النقاط
-    await pool.query(
+    await client.query(
       'UPDATE users SET points = points - $1 WHERE id=$2',
       [amount_points, req.userId]
     );
 
-    // تسجيل طلب السحب
-    await pool.query(
+    await client.query(
       `INSERT INTO withdrawals (user_id, amount_points, method, wallet_or_number)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1,$2,$3,$4)`,
       [req.userId, amount_points, method, wallet_or_number]
     );
 
-    // تسجيل في points_history
-    await pool.query(
+    await client.query(
       `INSERT INTO points_history (user_id, action, points)
-       VALUES ($1, 'withdraw_request', $2)`,
+       VALUES ($1,'withdraw_request',$2)`,
       [req.userId, -amount_points]
     );
 
-    res.json({
-      status: 'success',
-      message: 'Withdrawal request submitted'
-    });
+    await client.query('COMMIT');
 
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Withdrawal failed',
-      error: error.message
-    });
+    res.json({ status: 'success', message: 'Withdrawal request submitted' });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ status: 'error', message: 'Withdrawal failed' });
+  } finally {
+    client.release();
   }
 });
 
