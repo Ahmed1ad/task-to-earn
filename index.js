@@ -145,7 +145,65 @@ app.post('/auth/register', async (req, res) => {
 // Start Server
 // ==============================
 const PORT = process.env.PORT || 3000;
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Email and password are required'
+    });
+  }
+
+  try {
+    const userQuery = await pool.query(
+      'SELECT * FROM users WHERE email=$1',
+      [email]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password'
+      });
+    }
+
+    const user = userQuery.rows[0];
+
+    if (user.is_banned) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Account is banned'
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password'
+      });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      status: 'success',
+      token
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Login failed',
+      error: error.message
+    });
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   createUsersTable();
