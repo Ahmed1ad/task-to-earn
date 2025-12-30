@@ -178,22 +178,60 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
 });
 
 app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
-  const task = await pool.query('SELECT reward_points FROM tasks WHERE id=$1', [
-    req.params.taskId
-  ]);
+  const { taskId } = req.params;
 
-  await pool.query(
-    `UPDATE user_tasks SET status='completed',completed_at=NOW()
-     WHERE user_id=$1 AND task_id=$2 AND status!='completed'`,
-    [req.userId, req.params.taskId]
-  );
+  try {
+    // 1) هات بيانات التاسك
+    const taskRes = await pool.query(
+      `SELECT reward_points, duration_seconds FROM tasks WHERE id=$1`,
+      [taskId]
+    );
+    if (taskRes.rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Task not found' });
+    }
 
-  await pool.query(
-    `UPDATE users SET points=points+$1 WHERE id=$2`,
-    [task.rows[0].reward_points, req.userId]
-  );
+    // 2) هات وقت البداية
+    const userTaskRes = await pool.query(
+      `SELECT started_at, status FROM user_tasks WHERE user_id=$1 AND task_id=$2`,
+      [req.userId, taskId]
+    );
+    if (userTaskRes.rows.length === 0) {
+      return res.status(400).json({ status: 'error', message: 'Task not started' });
+    }
+    if (userTaskRes.rows[0].status === 'completed') {
+      return res.status(400).json({ status: 'error', message: 'Task already completed' });
+    }
 
-  res.json({ status: 'success', message: 'Ad completed, points added' });
+    // 3) احسب الوقت
+    const startedAt = new Date(userTaskRes.rows[0].started_at);
+    const now = new Date();
+    const elapsedSeconds = Math.floor((now - startedAt) / 1000);
+
+    if (elapsedSeconds < taskRes.rows[0].duration_seconds) {
+      return res.status(400).json({
+        status: 'error',
+        message: `You must watch at least ${taskRes.rows[0].duration_seconds} seconds`
+      });
+    }
+
+    // 4) كمّل + زوّد نقاط
+    await pool.query(
+      `UPDATE user_tasks
+       SET status='completed', completed_at=NOW()
+       WHERE user_id=$1 AND task_id=$2`,
+      [req.userId, taskId]
+    );
+
+    await pool.query(
+      `UPDATE users SET points = points + $1 WHERE id=$2`,
+      [taskRes.rows[0].reward_points, req.userId]
+    );
+
+    res.json({ status: 'success', message: 'Ad completed, points added' });
+
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
 });
 
 // ==============================
