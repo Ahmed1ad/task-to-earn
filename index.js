@@ -95,6 +95,27 @@ async function createUserTasksTable() {
   console.log('User tasks table ready ✅');
 }
 
+
+async function createPointsHistoryTable() {
+  const query = `
+    CREATE TABLE IF NOT EXISTS points_history (
+      id SERIAL PRIMARY KEY,
+      user_id INT NOT NULL,
+      action VARCHAR(50) NOT NULL,
+      points INT NOT NULL,
+      related_id INT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+  try {
+    await pool.query(query);
+    console.log('Points history table ready ✅');
+  } catch (err) {
+    console.error('Error creating points_history ❌', err);
+  }
+}
+
+
 // ==============================
 // Routes
 // ==============================
@@ -227,6 +248,12 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       [taskRes.rows[0].reward_points, req.userId]
     );
 
+    await pool.query(
+  `INSERT INTO points_history (user_id, action, points, related_id)
+   VALUES ($1, 'watch_ad', $2, $3)`,
+  [req.userId, taskRes.rows[0].reward_points, taskId]
+);
+
     res.json({ status: 'success', message: 'Ad completed, points added' });
 
   } catch (err) {
@@ -243,4 +270,5 @@ app.listen(PORT, () => {
   createUsersTable();
   createTasksTable();
   createUserTasksTable();
+  createPointsHistoryTable();
 });
