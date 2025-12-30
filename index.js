@@ -54,6 +54,36 @@ async function createUsersTable() {
   }
 }
 
+
+
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'No token provided'
+    });
+  }
+
+  const token = authHeader.split(' ')[1]; // Bearer TOKEN
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Invalid or expired token'
+    });
+  }
+}
+
+
+
+
 // ==============================
 // Routes
 // ==============================
@@ -204,6 +234,40 @@ app.post('/auth/login', async (req, res) => {
     });
   }
 });
+
+
+
+
+app.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const userQuery = await pool.query(
+      `SELECT id, username, email, points, balance, referral_code, created_at
+       FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      user: userQuery.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch user data'
+    });
+  }
+});
+
+
+
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   createUsersTable();
