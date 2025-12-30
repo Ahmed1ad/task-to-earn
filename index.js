@@ -282,96 +282,102 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
   res.json({ status: 'success', message: 'Ad started' });
 });
 
+
+
+
 app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
 
   try {
-    // 1) هات بيانات التاسك
+    // 1️⃣ جلب بيانات التاسك
     const taskRes = await pool.query(
-      `SELECT reward_points, duration_seconds FROM tasks WHERE id=$1`,
+      'SELECT reward_points, duration_seconds FROM tasks WHERE id = $1',
       [taskId]
     );
+
     if (taskRes.rows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Task not found' });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Task not found'
+      });
     }
 
-    // 2) هات وقت البداية
+    const rewardPoints = taskRes.rows[0].reward_points;
+    const durationSeconds = taskRes.rows[0].duration_seconds;
+
+    // 2️⃣ جلب بيانات user_task
     const userTaskRes = await pool.query(
-      `SELECT started_at, status FROM user_tasks WHERE user_id=$1 AND task_id=$2`,
+      'SELECT started_at, status FROM user_tasks WHERE user_id = $1 AND task_id = $2',
       [req.userId, taskId]
     );
+
     if (userTaskRes.rows.length === 0) {
-      return res.status(400).json({ status: 'error', message: 'Task not started' });
-    }
-    if (userTaskRes.rows[0].status === 'completed') {
-      return res.status(400).json({ status: 'error', message: 'Task already completed' });
+      return res.status(400).json({
+        status: 'error',
+        message: 'Task not started'
+      });
     }
 
-    // 3) احسب الوقت
+    if (userTaskRes.rows[0].status === 'completed') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Task already completed'
+      });
+    }
+
+    // 3️⃣ التحقق من مدة المشاهدة
     const startedAt = new Date(userTaskRes.rows[0].started_at);
     const now = new Date();
     const elapsedSeconds = Math.floor((now - startedAt) / 1000);
 
-    if (elapsedSeconds < taskRes.rows[0].duration_seconds) {
+    if (elapsedSeconds < durationSeconds) {
       return res.status(400).json({
         status: 'error',
-        message: `You must watch at least ${taskRes.rows[0].duration_seconds} seconds`
+        message: `You must watch at least ${durationSeconds} seconds`
       });
     }
 
-    // 4) كمّل + زوّد نقاط
+    // 4️⃣ تحديث حالة التاسك
     await pool.query(
       `UPDATE user_tasks
-       SET status='completed', completed_at=NOW()
-       WHERE user_id=$1 AND task_id=$2`,
+       SET status = 'completed', completed_at = NOW()
+       WHERE user_id = $1 AND task_id = $2`,
       [req.userId, taskId]
     );
 
+    // 5️⃣ زيادة نقاط المستخدم
     await pool.query(
-      `UPDATE users SET points = points + $1 WHERE id=$2`,
-      [taskRes.rows[0].reward_points, req.userId]
+      'UPDATE users SET points = points + $1 WHERE id = $2',
+      [rewardPoints, req.userId]
     );
 
-   // 🧾 تسجيل التاسك في Task History
-await pool.query(
-  `INSERT INTO user_tasks (user_id, task_id, task_type, points)
-   VALUES ($1, $2, 'ad', $3)`,
-  [req.userId, taskId, rewardPoints]
-);
-
-    // ✅ تسجيل إن المستخدم شاف الإعلان
-await pool.query(
-  'INSERT INTO user_ad_views (user_id, ad_id) VALUES ($1, $2)',
-  [req.userId, taskId]
-);
-
+    // 6️⃣ تسجيل الهستوري (اختياري لكنه مهم)
     await pool.query(
-  `INSERT INTO points_history (user_id, action, points, related_id)
-   VALUES ($1, 'watch_ad', $2, $3)`,
-  [req.userId, taskRes.rows[0].reward_points, taskId]
-);
+      `INSERT INTO points_history (user_id, action, points, related_id)
+       VALUES ($1, 'watch_ad', $2, $3)`,
+      [req.userId, rewardPoints, taskId]
+    );
 
-    res.json({ status: 'success', message: 'Ad completed, points added' });
+    // 7️⃣ تسجيل مشاهدة الإعلان
+    await pool.query(
+      'INSERT INTO user_ad_views (user_id, ad_id) VALUES ($1, $2)',
+      [req.userId, taskId]
+    );
+
+    // 8️⃣ الرد النهائي
+    res.json({
+      status: 'success',
+      message: 'Ad completed successfully',
+      reward_points: rewardPoints
+    });
 
   } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
+    console.error(err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
   }
-
-
-// 🚫 منع تكرار نفس الإعلان
-const alreadyCompleted = await pool.query(
-  'SELECT id FROM user_ad_views WHERE user_id=$1 AND ad_id=$2',
-  [req.userId, taskId]
-);
-
-if (alreadyCompleted.rows.length > 0) {
-  return res.status(400).json({
-    status: 'error',
-    message: 'Ad already completed'
-  });
-}
-
-  
 });
 
 
