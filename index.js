@@ -551,6 +551,26 @@ app.post('/admin/set-task-duration', async (req, res) => {
 
 
 
+// ⚠️ TEMP: Reset task for testing
+app.post('/admin/reset-user-task', authMiddleware, adminMiddleware, async (req, res) => {
+  const { userId, taskId } = req.body;
+
+  if (!userId || !taskId) {
+    return res.status(400).json({ status: 'error', message: 'userId and taskId required' });
+  }
+
+  await pool.query(
+    'DELETE FROM user_tasks WHERE user_id = $1 AND task_id = $2',
+    [userId, taskId]
+  );
+
+  res.json({
+    status: 'success',
+    message: `Task ${taskId} reset for user ${userId}`
+  });
+});
+
+
 // ==============================
 // Start Server
 // ==============================
