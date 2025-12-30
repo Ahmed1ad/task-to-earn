@@ -545,6 +545,30 @@ app.get('/tasks/my', authMiddleware, async (req, res) => {
 
 
 
+// ⚠️ Endpoint إداري مؤقت (احذفه بعد الاستخدام)
+app.post('/admin/set-task-duration', async (req, res) => {
+  const { taskId, duration } = req.body;
+
+  if (!taskId || !duration) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'taskId and duration are required'
+    });
+  }
+
+  await pool.query(
+    'UPDATE tasks SET duration_seconds = $1 WHERE id = $2',
+    [duration, taskId]
+  );
+
+  res.json({
+    status: 'success',
+    message: `Task ${taskId} duration updated to ${duration} seconds`
+  });
+});
+
+
+
 // ==============================
 // Start Server
 // ==============================
