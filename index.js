@@ -307,7 +307,7 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
 
 app.post('/withdraw/request', authMiddleware, async (req, res) => {
   const { amount_points, method, wallet_or_number } = req.body;
-  const MIN_WITHDRAW_POINTS = 50;
+  const MIN_WITHDRAW_POINTS = 10;
 
   if (!amount_points || !method || !wallet_or_number) {
     return res.status(400).json({ status: 'error', message: 'All fields are required' });
