@@ -116,6 +116,28 @@ async function createPointsHistoryTable() {
 }
 
 
+async function createWithdrawalsTable() {
+  const query = `
+    CREATE TABLE IF NOT EXISTS withdrawals (
+      id SERIAL PRIMARY KEY,
+      user_id INT NOT NULL,
+      amount_points INT NOT NULL,
+      method VARCHAR(30) NOT NULL,
+      wallet_or_number VARCHAR(100) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+  try {
+    await pool.query(query);
+    console.log('Withdrawals table ready ✅');
+  } catch (err) {
+    console.error('Error creating withdrawals ❌', err);
+  }
+}
+
+
+
 // ==============================
 // Routes
 // ==============================
@@ -261,6 +283,79 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
   }
 });
 
+
+
+
+
+app.post('/withdraw/request', authMiddleware, async (req, res) => {
+  const { amount_points, method, wallet_or_number } = req.body;
+
+  const MIN_WITHDRAW_POINTS = 100; // غيّرها براحتك
+
+  if (!amount_points || !method || !wallet_or_number) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'All fields are required'
+    });
+  }
+
+  if (amount_points < MIN_WITHDRAW_POINTS) {
+    return res.status(400).json({
+      status: 'error',
+      message: `Minimum withdrawal is ${MIN_WITHDRAW_POINTS} points`
+    });
+  }
+
+  try {
+    // هات رصيد المستخدم
+    const userRes = await pool.query(
+      'SELECT points FROM users WHERE id=$1',
+      [req.userId]
+    );
+
+    const userPoints = userRes.rows[0].points;
+
+    if (userPoints < amount_points) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Insufficient points'
+      });
+    }
+
+    // خصم النقاط
+    await pool.query(
+      'UPDATE users SET points = points - $1 WHERE id=$2',
+      [amount_points, req.userId]
+    );
+
+    // تسجيل طلب السحب
+    await pool.query(
+      `INSERT INTO withdrawals (user_id, amount_points, method, wallet_or_number)
+       VALUES ($1, $2, $3, $4)`,
+      [req.userId, amount_points, method, wallet_or_number]
+    );
+
+    // تسجيل في points_history
+    await pool.query(
+      `INSERT INTO points_history (user_id, action, points)
+       VALUES ($1, 'withdraw_request', $2)`,
+      [req.userId, -amount_points]
+    );
+
+    res.json({
+      status: 'success',
+      message: 'Withdrawal request submitted'
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Withdrawal failed',
+      error: error.message
+    });
+  }
+});
+
 // ==============================
 // Start Server
 // ==============================
@@ -271,4 +366,5 @@ app.listen(PORT, () => {
   createTasksTable();
   createUserTasksTable();
   createPointsHistoryTable();
+  createWithdrawalsTable();
 });
