@@ -356,6 +356,32 @@ app.post('/withdraw/request', authMiddleware, async (req, res) => {
   }
 });
 
+
+
+app.get('/withdraw/my', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, amount_points, method, wallet_or_number, status, created_at
+       FROM withdrawals
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [req.userId]
+    );
+
+    res.json({
+      status: 'success',
+      withdrawals: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch withdrawals'
+    });
+  }
+});
+
+
+
 // ==============================
 // Start Server
 // ==============================
