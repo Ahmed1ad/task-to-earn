@@ -38,6 +38,28 @@ const pool = new Pool({
 })();
 
 
+
+// ✅ إنشاء جدول Task History (مرة واحدة)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_tasks (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        task_id INTEGER NOT NULL,
+        task_type VARCHAR(50) NOT NULL,
+        points INTEGER NOT NULL,
+        status VARCHAR(20) DEFAULT 'completed',
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('user_tasks table ready ✅');
+  } catch (err) {
+    console.error('Error creating user_tasks table', err);
+  }
+})();
+
+
 // ==============================
 // Helpers
 // ==============================
