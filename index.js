@@ -742,6 +742,25 @@ app.put('/admin/tasks/:id', authMiddleware, adminMiddleware, async (req, res) =>
 });
 
 
+// ---------- Ads Tasks ----------
+app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
+  const { taskId } = req.params;
+
+  await pool.query(
+    `INSERT INTO user_tasks (user_id, task_id)
+     VALUES ($1, $2)
+     ON CONFLICT (user_id, task_id) DO NOTHING`,
+    [req.userId, taskId]
+  );
+
+  res.json({
+    status: 'success',
+    message: 'Ad started'
+  });
+});
+
+
+
 // ==============================
 // Start Server
 // ==============================
