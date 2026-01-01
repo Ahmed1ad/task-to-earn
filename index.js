@@ -1003,17 +1003,25 @@ app.get('/admin/banned-ips', authMiddleware, adminMiddleware, async (req, res) =
 
 
 
-app.post('/admin/unban-ip', authMiddleware, adminMiddleware, async (req, res) => {
-  const { ip } = req.body;
+// Admin - Unban User
+app.post('/admin/unban-user', authMiddleware, adminMiddleware, async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'userId is required'
+    });
+  }
 
   await pool.query(
-    'DELETE FROM banned_ips WHERE ip = $1',
-    [ip]
+    'UPDATE users SET is_banned = false WHERE id = $1',
+    [userId]
   );
 
   res.json({
     status: 'success',
-    message: 'IP unbanned'
+    message: 'User unbanned successfully'
   });
 });
 
