@@ -339,17 +339,6 @@ await pool.query(
   'UPDATE users SET last_ip = $1 WHERE id = $2',
   [ip, user.id]
 );
-
-
-const token = jwt.sign(
-  { userId: user.id },
-  process.env.JWT_SECRET,
-  { expiresIn: '7d' }
-);
-
-res.json({ status: 'success', token });
-
-
   const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.json({ status: 'success', token });
 });
