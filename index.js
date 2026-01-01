@@ -839,7 +839,6 @@ app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
     status: 'success',
     task: result.rows[0]
   });
-});
 
 
 // ==============================
