@@ -368,39 +368,36 @@ app.get('/me', authMiddleware, async (req, res) => {
 
 app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
-  
-  if (isNaN(taskId)) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'رقم المهمة غير صحيح'
-    });
-  }
-
 
   try {
-    // 1️⃣ جلب بيانات التاسك
+    // 1️⃣ بيانات المهمة
     const taskRes = await pool.query(
-      'SELECT reward_points, duration_seconds FROM tasks WHERE id = $1',
+      `SELECT reward_points, duration_seconds
+       FROM tasks
+       WHERE id = $1`,
       [taskId]
     );
 
-    if (taskRes.rows.length === 0) {
+    if (!taskRes.rows.length) {
       return res.status(404).json({
         status: 'error',
         message: 'Task not found'
       });
     }
 
-    const rewardPoints = taskRes.rows[0].reward_points;
-    const durationSeconds = taskRes.rows[0].duration_seconds;
+    const { reward_points, duration_seconds } = taskRes.rows[0];
 
-    // 2️⃣ جلب بيانات user_task
+    // 2️⃣ بيانات user_task
     const userTaskRes = await pool.query(
-      'SELECT started_at, status FROM user_tasks WHERE user_id = $1 AND task_id = $2',
+      `
+      SELECT started_at, status
+      FROM user_tasks
+      WHERE user_id = $1 AND task_id = $2
+      `,
       [req.userId, taskId]
     );
 
-    if (userTaskRes.rows.length === 0) {
+    if (!userTaskRes.rows.length) {
       return res.status(400).json({
         status: 'error',
         message: 'Task not started'
@@ -414,57 +411,45 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       });
     }
 
-    // 3️⃣ التحقق من مدة المشاهدة
+    // 3️⃣ حساب الوقت (السيرفر)
     const startedAt = new Date(userTaskRes.rows[0].started_at);
     const now = new Date();
     const elapsedSeconds = Math.floor((now - startedAt) / 1000);
 
-    if (elapsedSeconds < durationSeconds) {
+    if (elapsedSeconds < duration_seconds) {
       return res.status(400).json({
         status: 'error',
-        message: `You must watch at least ${durationSeconds} seconds`
+        message: 'Task time not completed'
       });
     }
 
-    // 4️⃣ تحديث حالة التاسك
+    // 4️⃣ تحديث المهمة
     await pool.query(
-      `UPDATE user_tasks
-       SET status = 'completed', completed_at = NOW()
-       WHERE user_id = $1 AND task_id = $2`,
+      `
+      UPDATE user_tasks
+      SET status = 'completed',
+          completed_at = NOW()
+      WHERE user_id = $1 AND task_id = $2
+      `,
       [req.userId, taskId]
     );
 
-    // 5️⃣ زيادة نقاط المستخدم
+    // 5️⃣ إضافة النقاط
     await pool.query(
       'UPDATE users SET points = points + $1 WHERE id = $2',
-      [rewardPoints, req.userId]
+      [reward_points, req.userId]
     );
 
-    // 6️⃣ تسجيل الهستوري (اختياري لكنه مهم)
-    await pool.query(
-      `INSERT INTO points_history (user_id, action, points, related_id)
-       VALUES ($1, 'watch_ad', $2, $3)`,
-      [req.userId, rewardPoints, taskId]
-    );
-
-    // 7️⃣ تسجيل مشاهدة الإعلان
-    await pool.query(
-      'INSERT INTO user_ad_views (user_id, ad_id) VALUES ($1, $2)',
-      [req.userId, taskId]
-    );
-
-    // 8️⃣ الرد النهائي
     res.json({
       status: 'success',
-      message: 'Ad completed successfully',
-      reward_points: rewardPoints
+      reward_points
     });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: 'error',
-      message: 'Server error'
+      message: 'Failed to complete task'
     });
   }
 });
@@ -793,30 +778,33 @@ app.delete("/admin/delete-task/:id", authMiddleware, adminMiddleware, async (req
 // ===============================
 app.get('/tasks/ads', authMiddleware, async (req, res) => {
   try {
-    const tasks = await pool.query(`
-  SELECT t.*
-  FROM tasks t
-  WHERE t.task_type = 'watch_ad'
-    AND t.is_active = true
-    AND NOT EXISTS (
-      SELECT 1
-      FROM user_tasks ut
-      WHERE ut.user_id = $1
-        AND ut.task_id = t.id
-        AND ut.status = 'completed'
-    )
-`, [req.userId]);
+    const tasks = await pool.query(
+      `
+      SELECT t.*
+      FROM tasks t
+      WHERE t.task_type = 'watch_ad'
+        AND t.is_active = true
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_tasks ut
+          WHERE ut.user_id = $1
+            AND ut.task_id = t.id
+            AND ut.status = 'completed'
+        )
+      `,
+      [req.userId]
+    );
 
     res.json({
-  status: 'success',
-  tasks: tasks.rows
-});
+      status: 'success',
+      tasks: tasks.rows
+    });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to load tasks'
+      message: 'Failed to fetch tasks'
     });
   }
 });
@@ -1150,20 +1138,54 @@ app.get('/auth/check', authMiddleware, async (req, res) => {
 app.post('/tasks/ads/fail/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
 
-  await pool.query(`
-    UPDATE user_tasks
-    SET status = 'failed'
-    WHERE user_id = $1
-      AND task_id = $2
-      AND status = 'started'
-  `, [req.userId, taskId]);
+  try {
+    const userTask = await pool.query(
+      `
+      SELECT status
+      FROM user_tasks
+      WHERE user_id = $1 AND task_id = $2
+      `,
+      [req.userId, taskId]
+    );
 
-  res.json({
-    status: 'success',
-    message: 'Task failed'
-  });
+    if (!userTask.rows.length) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Task not started'
+      });
+    }
+
+    // لو اكتملت خلاص ماينفعش تفشل
+    if (userTask.rows[0].status === 'completed') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Task already completed'
+      });
+    }
+
+    // تحديث الحالة لفشل
+    await pool.query(
+      `
+      UPDATE user_tasks
+      SET status = 'failed'
+      WHERE user_id = $1 AND task_id = $2
+      `,
+      [req.userId, taskId]
+    );
+
+    res.json({
+      status: 'success',
+      message: 'Task marked as failed'
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to mark task as failed'
+    });
+  }
 });
-
 
 // ==============================
 // Start Server
