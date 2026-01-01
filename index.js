@@ -681,6 +681,67 @@ app.get('/tasks/ads', authMiddleware, async (req, res) => {
 });
 
 
+
+app.get('/tasks/completed', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `
+    SELECT t.title, ut.completed_at, ut.points
+    FROM user_tasks ut
+    JOIN tasks t ON t.id = ut.task_id
+    WHERE ut.user_id = $1
+      AND ut.status = 'completed'
+    ORDER BY ut.completed_at DESC
+    `,
+    [req.userId]
+  );
+
+  res.json({
+    status: 'success',
+    tasks: result.rows
+  });
+});
+
+
+
+app.post('/admin/tasks/:id/toggle', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  await pool.query(
+    `UPDATE tasks
+     SET is_active = NOT is_active
+     WHERE id = $1`,
+    [id]
+  );
+
+  res.json({
+    status: 'success',
+    message: 'Task status toggled'
+  });
+});
+
+
+
+
+app.put('/admin/tasks/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  const { title, description, reward_points, duration_seconds, ad_url } = req.body;
+
+  await pool.query(
+    `
+    UPDATE tasks
+    SET title=$1,
+        description=$2,
+        reward_points=$3,
+        duration_seconds=$4,
+        ad_url=$5
+    WHERE id=$6
+    `,
+    [title, description, reward_points, duration_seconds, ad_url, req.params.id]
+  );
+
+  res.json({ status: 'success' });
+});
+
+
 // ==============================
 // Start Server
 // ==============================
