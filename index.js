@@ -356,19 +356,6 @@ await pool.query(
 });
 
 
-app.get('/auth/check', authMiddleware, async (req, res) => {
-  const user = await pool.query(
-    'SELECT id, username, points FROM users WHERE id = $1',
-    [req.userId]
-  );
-
-  res.json({
-    status: 'success',
-    user: user.rows[0]
-  });
-});
-
-
 app.get('/me', authMiddleware, async (req, res) => {
   const user = await pool.query(
     `SELECT id,username,email,points,balance,referral_code,created_at
@@ -813,9 +800,9 @@ app.get('/tasks/ads', authMiddleware, async (req, res) => {
 `, [req.userId]);
 
     res.json({
-      status: 'success',
-      tasks: result.rows
-    });
+  status: 'success',
+  tasks: tasks.rows
+});
 
   } catch (err) {
     console.error(err);
@@ -1101,9 +1088,16 @@ app.get('/health/db', async (req, res) => {
 app.get('/auth/check', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, username, email, points, is_banned
-       FROM users
-       WHERE id = $1`,
+      `
+      SELECT 
+        id,
+        username,
+        email,
+        points,
+        is_banned
+      FROM users
+      WHERE id = $1
+      `,
       [req.userId]
     );
 
@@ -1116,6 +1110,7 @@ app.get('/auth/check', authMiddleware, async (req, res) => {
 
     const user = result.rows[0];
 
+    // 🔒 لو المستخدم محظور
     if (user.is_banned) {
       return res.status(403).json({
         status: 'banned',
@@ -1123,12 +1118,19 @@ app.get('/auth/check', authMiddleware, async (req, res) => {
       });
     }
 
+    // ✅ كل شيء تمام
     res.json({
       status: 'success',
-      user
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        points: user.points
+      }
     });
 
   } catch (err) {
+    console.error('Auth check error:', err);
     res.status(500).json({
       status: 'error',
       message: 'Auth check failed'
