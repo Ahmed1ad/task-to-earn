@@ -551,7 +551,10 @@ app.get('/tasks/my', authMiddleware, async (req, res) => {
 
 
 // ⚠️ Endpoint إداري مؤقت (احذفه بعد الاستخدام)
-app.post('/admin/set-task-duration', async (req, res) => {
+app.post('/admin/set-task-duration',
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
   const { taskId, duration } = req.body;
 
 if (isNaN(taskId)) {
@@ -787,17 +790,31 @@ app.put('/admin/tasks/:id', authMiddleware, adminMiddleware, async (req, res) =>
 });
 
 
-// ---------- Ads Tasks ----------
 app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
 
-if (isNaN(taskId)) {
+  // 1️⃣ Validation
+  if (isNaN(taskId)) {
     return res.status(400).json({
       status: 'error',
       message: 'رقم المهمة غير صحيح'
     });
   }
 
+  // 2️⃣ 🔒 التحقق هل الإعلان اتشاف قبل كده
+  const viewed = await pool.query(
+    'SELECT 1 FROM user_ad_views WHERE user_id=$1 AND ad_id=$2',
+    [req.userId, taskId]
+  );
+
+  if (viewed.rows.length) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Ad already watched'
+    });
+  }
+
+  // 3️⃣ تسجيل بدء المهمة
   await pool.query(
     `INSERT INTO user_tasks (user_id, task_id)
      VALUES ($1, $2)
