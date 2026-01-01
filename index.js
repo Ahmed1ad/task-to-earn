@@ -267,6 +267,22 @@ app.use(async (req, res, next) => {
 });
 
 
+// ===============================
+// Run once: add last_ip to users
+// ===============================
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS last_ip TEXT
+    `);
+    console.log('last_ip column ready ✅');
+  } catch (err) {
+    console.error('Error adding last_ip ❌', err);
+  }
+})();
+
+
 
 // ==============================
 // Routes
@@ -311,6 +327,28 @@ app.post('/auth/login', async (req, res) => {
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok)
     return res.status(401).json({ status: 'error', message: 'Invalid login' });
+
+
+// 📌 جلب IP المستخدم
+const ip =
+  req.headers['x-forwarded-for']?.split(',')[0] ||
+  req.socket.remoteAddress;
+
+// 💾 تخزين IP في حساب المستخدم
+await pool.query(
+  'UPDATE users SET last_ip = $1 WHERE id = $2',
+  [ip, user.id]
+);
+
+
+const token = jwt.sign(
+  { userId: user.id },
+  process.env.JWT_SECRET,
+  { expiresIn: '7d' }
+);
+
+res.json({ status: 'success', token });
+
 
   const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.json({ status: 'success', token });
@@ -941,6 +979,57 @@ app.post('/admin/ban-user', authMiddleware, adminMiddleware, async (req, res) =>
     message: ban ? 'User banned' : 'User unbanned'
   });
 });
+
+
+
+app.get('/admin/banned-users', authMiddleware, adminMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, username, email, created_at
+     FROM users
+     WHERE is_banned = true
+     ORDER BY created_at DESC`
+  );
+
+  res.json({
+    status: 'success',
+    users: result.rows
+  });
+});
+
+
+
+app.get('/admin/banned-ips', authMiddleware, adminMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `SELECT ip, reason, created_at
+     FROM banned_ips
+     ORDER BY created_at DESC`
+  );
+
+  res.json({
+    status: 'success',
+    ips: result.rows
+  });
+});
+
+
+
+
+app.post('/admin/unban-ip', authMiddleware, adminMiddleware, async (req, res) => {
+  const { ip } = req.body;
+
+  await pool.query(
+    'DELETE FROM banned_ips WHERE ip = $1',
+    [ip]
+  );
+
+  res.json({
+    status: 'success',
+    message: 'IP unbanned'
+  });
+});
+
+
+
 
 
 // ==============================
