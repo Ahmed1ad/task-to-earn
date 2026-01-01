@@ -19,6 +19,23 @@ const pool = new Pool({
 
 
 
+// ===============================
+// Run once: add ad_url column
+// ===============================
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE tasks
+      ADD COLUMN IF NOT EXISTS ad_url TEXT
+    `);
+    console.log("ad_url column ready ✅");
+  } catch (err) {
+    console.error("Error adding ad_url column ❌", err);
+  }
+})();
+
+
+
 // ✅ إنشاء جدول منع تكرار مشاهدة الإعلانات (مرة واحدة)
 (async () => {
   try {
@@ -233,32 +250,7 @@ app.get('/me', authMiddleware, async (req, res) => {
   res.json({ status: 'success', user: user.rows[0] });
 });
 
-// ---------- Ads Tasks ----------
-app.post('/admin/add-ad', async (req, res) => {
-  const { title, description, reward_points, duration_seconds } = req.body;
-  await pool.query(
-    `INSERT INTO tasks (title,description,task_type,reward_points,duration_seconds)
-     VALUES ($1,$2,'watch_ad',$3,$4)`,
-    [title, description, reward_points, duration_seconds]
-  );
-  res.json({ status: 'success', message: 'Ad added' });
-});
 
-app.get('/tasks/ads', authMiddleware, async (req, res) => {
-  const tasks = await pool.query(
-    `SELECT * FROM tasks WHERE task_type='watch_ad' AND is_active=true`
-  );
-  res.json({ status: 'success', tasks: tasks.rows });
-});
-
-app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
-  await pool.query(
-    `INSERT INTO user_tasks (user_id,task_id)
-     VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-    [req.userId, req.params.taskId]
-  );
-  res.json({ status: 'success', message: 'Ad started' });
-});
 
 
 
@@ -569,6 +561,86 @@ app.post('/admin/reset-user-task', authMiddleware, adminMiddleware, async (req, 
     message: `Task ${taskId} reset for user ${userId}`
   });
 });
+
+
+
+// ===============================
+// Admin - Add Task (with ad_url)
+// ===============================
+app.post("/admin/add-task", authMiddleware, async (req, res) => {
+  const {
+    title,
+    description,
+    reward_points,
+    duration_seconds,
+    ad_url
+  } = req.body;
+
+  if (!title || !reward_points || !duration_seconds || !ad_url) {
+    return res.status(400).json({
+      status: "error",
+      message: "title, reward_points, duration_seconds, ad_url are required"
+    });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO tasks
+       (title, description, task_type, reward_points, duration_seconds, ad_url)
+       VALUES ($1, $2, 'watch_ad', $3, $4, $5)`,
+      [
+        title,
+        description || "",
+        reward_points,
+        duration_seconds,
+        ad_url
+      ]
+    );
+
+    res.json({
+      status: "success",
+      message: "Task added successfully"
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to add task"
+    });
+  }
+});
+
+
+
+
+// ===============================
+// Admin - Disable Task
+// ===============================
+app.delete("/admin/delete-task/:id", authMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await pool.query(
+      `UPDATE tasks
+       SET is_active = false
+       WHERE id = $1`,
+      [id]
+    );
+
+    res.json({
+      status: "success",
+      message: "Task disabled successfully"
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to delete task"
+    });
+  }
+});
+
 
 
 // ==============================
