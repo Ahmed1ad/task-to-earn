@@ -32,6 +32,25 @@ const pool = new Pool({
 
 
 
+
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS banned_ips (
+        id SERIAL PRIMARY KEY,
+        ip TEXT UNIQUE,
+        reason TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('banned_ips table ready ✅');
+  } catch (err) {
+    console.error('Error creating banned_ips ❌', err);
+  }
+})();
+
+
+
 // ===============================
 // Run once: add ad_url column
 // ===============================
@@ -78,18 +97,33 @@ function generateReferralCode() {
 // ==============================
 // Auth Middleware
 // ==============================
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(401).json({ status: 'error', message: 'No token provided' });
   }
 
   const token = authHeader.split(' ')[1];
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.userId;
+
+    // 🔒 check if user is banned
+    const user = await pool.query(
+      'SELECT is_banned FROM users WHERE id = $1',
+      [req.userId]
+    );
+
+    if (!user.rows.length || user.rows[0].is_banned) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Your account has been banned'
+      });
+    }
+
     next();
-  } catch {
+  } catch (err) {
     return res.status(401).json({ status: 'error', message: 'Invalid token' });
   }
 }
@@ -208,12 +242,40 @@ async function createWithdrawalsTable() {
 
 
 
+app.use(async (req, res, next) => {
+  try {
+    const ip =
+      req.headers['x-forwarded-for']?.split(',')[0] ||
+      req.socket.remoteAddress;
+
+    const banned = await pool.query(
+      'SELECT 1 FROM banned_ips WHERE ip = $1',
+      [ip]
+    );
+
+    if (banned.rows.length) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Your IP is banned'
+      });
+    }
+
+    next();
+  } catch (err) {
+    next();
+  }
+});
+
+
+
 // ==============================
 // Routes
 // ==============================
 app.get('/', (req, res) => {
   res.json({ status: 'success', message: 'Task to Earn API is running 🚀' });
 });
+
+
 
 // ---------- Auth ----------
 app.post('/auth/register', async (req, res) => {
@@ -853,6 +915,30 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
   res.json({
     status: 'success',
     task: result.rows[0]
+  });
+});
+
+
+
+
+app.post('/admin/ban-user', authMiddleware, adminMiddleware, async (req, res) => {
+  const { userId, ban } = req.body; // ban = true | false
+
+  if (typeof ban !== 'boolean') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'ban must be true or false'
+    });
+  }
+
+  await pool.query(
+    'UPDATE users SET is_banned = $1 WHERE id = $2',
+    [ban, userId]
+  );
+
+  res.json({
+    status: 'success',
+    message: ban ? 'User banned' : 'User unbanned'
   });
 });
 
