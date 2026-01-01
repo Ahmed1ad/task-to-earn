@@ -830,10 +830,8 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
 
 
 
-// ===============================
-// Get single task details
-// ===============================
-app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
+
+  app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query(
@@ -856,6 +854,7 @@ app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
     status: 'success',
     task: result.rows[0]
   });
+});
 
 
 // ==============================
