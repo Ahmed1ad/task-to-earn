@@ -761,6 +761,35 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
 
 
 
+// ===============================
+// Get single task details
+// ===============================
+app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  const result = await pool.query(
+    `
+    SELECT id, title, description, reward_points, duration_seconds, ad_url
+    FROM tasks
+    WHERE id = $1 AND is_active = true
+    `,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({
+      status: 'error',
+      message: 'Task not found'
+    });
+  }
+
+  res.json({
+    status: 'success',
+    task: result.rows[0]
+  });
+});
+
+
 // ==============================
 // Start Server
 // ==============================
