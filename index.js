@@ -643,6 +643,44 @@ app.delete("/admin/delete-task/:id", authMiddleware, async (req, res) => {
 
 
 
+
+// ===============================
+// Get available ad tasks for user
+// ===============================
+app.get('/tasks/ads', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM tasks t
+      WHERE t.task_type = 'watch_ad'
+        AND t.is_active = true
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_tasks ut
+          WHERE ut.user_id = $1
+            AND ut.task_id = t.id
+        )
+      ORDER BY t.created_at DESC
+      `,
+      [req.userId]
+    );
+
+    res.json({
+      status: 'success',
+      tasks: result.rows
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to load tasks'
+    });
+  }
+});
+
+
 // ==============================
 // Start Server
 // ==============================
