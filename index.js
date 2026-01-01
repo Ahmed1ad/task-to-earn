@@ -4,10 +4,23 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const tasksLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 دقيقة
+  max: 15, // 15 طلب في الدقيقة
+  message: {
+    status: 'error',
+    message: 'طلبات كثيرة جدًا، حاول بعد دقيقة'
+  }
+});
+
+// طبّقه على كل مسارات التاسكات
+app.use('/tasks', tasksLimiter);
 
 // ==============================
 // PostgreSQL Connection
@@ -251,12 +264,16 @@ app.get('/me', authMiddleware, async (req, res) => {
 });
 
 
-
-
-
-
 app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
+  
+  if (isNaN(taskId)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'رقم المهمة غير صحيح'
+    });
+  }
+
 
   try {
     // 1️⃣ جلب بيانات التاسك
@@ -523,6 +540,13 @@ app.get('/tasks/my', authMiddleware, async (req, res) => {
 app.post('/admin/set-task-duration', async (req, res) => {
   const { taskId, duration } = req.body;
 
+if (isNaN(taskId)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'رقم المهمة غير صحيح'
+    });
+  }
+
   if (!taskId || !duration) {
     return res.status(400).json({
       status: 'error',
@@ -546,6 +570,13 @@ app.post('/admin/set-task-duration', async (req, res) => {
 // ⚠️ TEMP: Reset task for testing
 app.post('/admin/reset-user-task', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, taskId } = req.body;
+  
+  if (isNaN(taskId)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'رقم المهمة غير صحيح'
+    });
+  }
 
   if (!userId || !taskId) {
     return res.status(400).json({ status: 'error', message: 'userId and taskId required' });
@@ -745,6 +776,13 @@ app.put('/admin/tasks/:id', authMiddleware, adminMiddleware, async (req, res) =>
 // ---------- Ads Tasks ----------
 app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
+
+if (isNaN(taskId)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'رقم المهمة غير صحيح'
+    });
+  }
 
   await pool.query(
     `INSERT INTO user_tasks (user_id, task_id)
