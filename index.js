@@ -612,28 +612,36 @@ app.get('/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) 
 
 
 app.get('/tasks/my', authMiddleware, async (req, res) => {
-  const result = await pool.query(
-    `
-    SELECT 
-      ut.task_id,
-      t.title,
-      t.task_type,
-      t.reward_points,
-      ut.status,
-      ut.started_at,
-      ut.completed_at
-    FROM user_tasks ut
-    JOIN tasks t ON t.id = ut.task_id
-    WHERE ut.user_id = $1
-    ORDER BY ut.started_at DESC
-    `,
-    [req.userId]
-  );
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        ut.task_id,
+        ut.status,
+        ut.started_at,
+        ut.completed_at,
+        t.title,
+        t.reward_points
+      FROM user_tasks ut
+      JOIN tasks t ON t.id = ut.task_id
+      WHERE ut.user_id = $1
+      ORDER BY ut.started_at DESC
+      `,
+      [req.userId]
+    );
 
-  res.json({
-    status: 'success',
-    tasks: result.rows
-  });
+    res.json({
+      status: 'success',
+      tasks: result.rows
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch user tasks'
+    });
+  }
 });
 
 
