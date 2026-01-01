@@ -454,6 +454,15 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       [req.userId, taskId]
     );
 
+
+    // لو المستخدم حاول يكمل قبل الوقت
+if (elapsedSeconds < durationSeconds) {
+  return res.status(400).json({
+    status: 'error',
+    message: 'Task not completed, time not finished'
+  });
+}
+
     // 8️⃣ الرد النهائي
     res.json({
       status: 'success',
