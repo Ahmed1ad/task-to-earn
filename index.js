@@ -254,6 +254,20 @@ app.post('/auth/login', async (req, res) => {
   res.json({ status: 'success', token });
 });
 
+
+app.get('/auth/check', authMiddleware, async (req, res) => {
+  const user = await pool.query(
+    'SELECT id, username, points FROM users WHERE id = $1',
+    [req.userId]
+  );
+
+  res.json({
+    status: 'success',
+    user: user.rows[0]
+  });
+});
+
+
 app.get('/me', authMiddleware, async (req, res) => {
   const user = await pool.query(
     `SELECT id,username,email,points,balance,referral_code,created_at
