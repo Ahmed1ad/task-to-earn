@@ -1030,6 +1030,21 @@ app.post('/admin/unban-ip', authMiddleware, adminMiddleware, async (req, res) =>
 
 
 
+app.get('/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `
+    SELECT id, username, email, last_ip, is_banned, created_at
+    FROM users
+    ORDER BY created_at DESC
+    `
+  );
+
+  res.json({
+    status: 'success',
+    users: result.rows
+  });
+});
+
 
 
 // ==============================
