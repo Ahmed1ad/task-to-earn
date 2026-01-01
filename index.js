@@ -31,9 +31,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-ALTER TABLE user_tasks
-ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'started';
-
 
 (async () => {
   try {
@@ -51,7 +48,20 @@ ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'started';
   }
 })();
 
-
+// ===============================
+// Run once: add status column to user_tasks
+// ===============================
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE user_tasks
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'started'
+    `);
+    console.log('status column ready ✅');
+  } catch (err) {
+    console.error('Error adding status column ❌', err);
+  }
+})();
 
 // ===============================
 // Run once: add ad_url column
@@ -881,7 +891,6 @@ app.put('/admin/tasks/:id', authMiddleware, adminMiddleware, async (req, res) =>
 app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
 
-  // 1️⃣ Validation
   if (isNaN(taskId)) {
     return res.status(400).json({
       status: 'error',
@@ -889,7 +898,7 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
     });
   }
 
-  // 2️⃣ 🔒 التحقق هل الإعلان اتشاف قبل كده (مكتمل)
+  // ❌ لو كان كملها قبل كده
   const viewed = await pool.query(
     'SELECT 1 FROM user_ad_views WHERE user_id=$1 AND ad_id=$2',
     [req.userId, taskId]
@@ -902,7 +911,7 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
     });
   }
 
-  // 3️⃣ ✅ تسجيل بدء المهمة (مع status + وقت)
+  // ✅ سجل بدء المهمة (وأعدها started دايمًا)
   await pool.query(
     `
     INSERT INTO user_tasks (user_id, task_id, status, started_at)
@@ -910,7 +919,8 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
     ON CONFLICT (user_id, task_id)
     DO UPDATE SET
       status = 'started',
-      started_at = NOW()
+      started_at = NOW(),
+      completed_at = NULL
     `,
     [req.userId, taskId]
   );
