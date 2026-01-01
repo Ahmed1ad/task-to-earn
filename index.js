@@ -567,7 +567,7 @@ app.post('/admin/reset-user-task', authMiddleware, adminMiddleware, async (req, 
 // ===============================
 // Admin - Add Task (with ad_url)
 // ===============================
-app.post("/admin/add-task", authMiddleware, async (req, res) => {
+app.post("/admin/add-task", authMiddleware, adminMiddleware, async (req, res) => {
   const {
     title,
     description,
@@ -617,7 +617,7 @@ app.post("/admin/add-task", authMiddleware, async (req, res) => {
 // ===============================
 // Admin - Disable Task
 // ===============================
-app.delete("/admin/delete-task/:id", authMiddleware, async (req, res) => {
+app.delete("/admin/delete-task/:id", authMiddleware, adminMiddleware, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -685,7 +685,7 @@ app.get('/tasks/ads', authMiddleware, async (req, res) => {
 app.get('/tasks/completed', authMiddleware, async (req, res) => {
   const result = await pool.query(
     `
-    SELECT t.title, ut.completed_at, ut.points
+    SELECT t.title, ut.completed_at, t.reward_points
     FROM user_tasks ut
     JOIN tasks t ON t.id = ut.task_id
     WHERE ut.user_id = $1
