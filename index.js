@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
+app.set('trust proxy', 1);
 app.use(express.json());
 
 const tasksLimiter = rateLimit({
@@ -30,7 +31,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-
+ALTER TABLE user_tasks
+ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'started';
 
 
 (async () => {
@@ -786,22 +788,19 @@ app.delete("/admin/delete-task/:id", authMiddleware, adminMiddleware, async (req
 // ===============================
 app.get('/tasks/ads', authMiddleware, async (req, res) => {
   try {
-    const result = await pool.query(
-      `
-      SELECT *
-      FROM tasks t
-      WHERE t.task_type = 'watch_ad'
-        AND t.is_active = true
-        AND NOT EXISTS (
-          SELECT 1
-          FROM user_tasks ut
-          WHERE ut.user_id = $1
-            AND ut.task_id = t.id
-        )
-      ORDER BY t.created_at DESC
-      `,
-      [req.userId]
-    );
+    const tasks = await pool.query(`
+  SELECT t.*
+  FROM tasks t
+  WHERE t.task_type = 'watch_ad'
+    AND t.is_active = true
+    AND NOT EXISTS (
+      SELECT 1
+      FROM user_tasks ut
+      WHERE ut.user_id = $1
+        AND ut.task_id = t.id
+        AND ut.status = 'completed'
+    )
+`, [req.userId]);
 
     res.json({
       status: 'success',
@@ -890,7 +889,7 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
     });
   }
 
-  // 2️⃣ 🔒 التحقق هل الإعلان اتشاف قبل كده
+  // 2️⃣ 🔒 التحقق هل الإعلان اتشاف قبل كده (مكتمل)
   const viewed = await pool.query(
     'SELECT 1 FROM user_ad_views WHERE user_id=$1 AND ad_id=$2',
     [req.userId, taskId]
@@ -899,21 +898,26 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
   if (viewed.rows.length) {
     return res.status(400).json({
       status: 'error',
-      message: 'Ad already watched'
+      message: 'تم تنفيذ هذه المهمة من قبل'
     });
   }
 
-  // 3️⃣ تسجيل بدء المهمة
+  // 3️⃣ ✅ تسجيل بدء المهمة (مع status + وقت)
   await pool.query(
-    `INSERT INTO user_tasks (user_id, task_id)
-     VALUES ($1, $2)
-     ON CONFLICT (user_id, task_id) DO NOTHING`,
+    `
+    INSERT INTO user_tasks (user_id, task_id, status, started_at)
+    VALUES ($1, $2, 'started', NOW())
+    ON CONFLICT (user_id, task_id)
+    DO UPDATE SET
+      status = 'started',
+      started_at = NOW()
+    `,
     [req.userId, taskId]
   );
 
   res.json({
     status: 'success',
-    message: 'Ad started'
+    message: 'تم بدء المهمة'
   });
 });
 
@@ -1120,6 +1124,24 @@ app.get('/auth/check', authMiddleware, async (req, res) => {
       message: 'Auth check failed'
     });
   }
+});
+
+
+app.post('/tasks/ads/fail/:taskId', authMiddleware, async (req, res) => {
+  const { taskId } = req.params;
+
+  await pool.query(`
+    UPDATE user_tasks
+    SET status = 'failed'
+    WHERE user_id = $1
+      AND task_id = $2
+      AND status = 'started'
+  `, [req.userId, taskId]);
+
+  res.json({
+    status: 'success',
+    message: 'Task failed'
+  });
 });
 
 
