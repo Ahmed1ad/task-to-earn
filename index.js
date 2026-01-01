@@ -832,6 +832,37 @@ app.get('/tasks/completed', authMiddleware, async (req, res) => {
 
 
 
+async function loadCompletedTasks() {
+  setActiveTab("completed");
+  showSkeleton();
+
+  const res = await fetch(API + "/tasks/completed", {
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  const data = await res.json();
+
+  if (!data.tasks || data.tasks.length === 0) {
+    showEmpty("لا توجد مهام مكتملة");
+    return;
+  }
+
+  document.getElementById("tasksContainer").innerHTML =
+    data.tasks.map(t => `
+      <div class="bg-white rounded-2xl shadow p-4 flex flex-col gap-2 opacity-80">
+        <h3 class="font-bold text-lg">${t.title}</h3>
+        <div class="flex justify-between text-sm">
+          <span class="text-green-600">✔ مكتملة</span>
+          <span class="font-bold text-emerald-600">
+            +${t.reward_points} نقطة
+          </span>
+        </div>
+      </div>
+    `).join("");
+}
+
+
+
 app.post('/admin/tasks/:id/toggle', authMiddleware, adminMiddleware, async (req, res) => {
   const { id } = req.params;
 
