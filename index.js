@@ -1056,6 +1056,73 @@ app.get('/health', (req, res) => {
 });
 
 
+
+// ==============================
+// Health Check (Database)
+// ==============================
+app.get('/health/db', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+
+    res.json({
+      status: 'ok',
+      server: 'running',
+      database: 'connected'
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      server: 'running',
+      database: 'disconnected'
+    });
+  }
+});
+
+
+
+
+// ==============================
+// Auth Check (Frontend Helper)
+// ==============================
+app.get('/auth/check', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, username, email, points, is_banned
+       FROM users
+       WHERE id = $1`,
+      [req.userId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (user.is_banned) {
+      return res.status(403).json({
+        status: 'banned',
+        message: 'User is banned'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      user
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Auth check failed'
+    });
+  }
+});
+
+
 // ==============================
 // Start Server
 // ==============================
