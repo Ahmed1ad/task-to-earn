@@ -1045,6 +1045,18 @@ app.get('/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
 
 
 // ==============================
+// Health Check
+// ==============================
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date()
+  });
+});
+
+
+// ==============================
 // Start Server
 // ==============================
 const PORT = process.env.PORT || 3000;
