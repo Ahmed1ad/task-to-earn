@@ -1271,7 +1271,6 @@ app.post(
     try {
       const { taskId } = req.params;
 
-      // 1️⃣ تحقق من وجود ملف
       if (!req.file) {
         return res.status(400).json({
           status: "error",
@@ -1279,20 +1278,18 @@ app.post(
         });
       }
 
-      // 2️⃣ تأكد إن المهمة موجودة
       const taskResult = await pool.query(
-  "SELECT * FROM tasks WHERE id = $1 AND task_type = 'manual'",
-  [taskId]
-);
+        "SELECT * FROM tasks WHERE id = $1 AND task_type = 'manual'",
+        [taskId]
+      );
 
       if (!taskResult.rows.length) {
         return res.status(404).json({
           status: "error",
-          message: "المهمة غير موجودة"
+          message: "المهمة غير موجودة أو ليست يدوية"
         });
       }
 
-      // 3️⃣ منع التكرار
       const exists = await pool.query(
         "SELECT 1 FROM user_tasks WHERE user_id=$1 AND task_id=$2",
         [req.userId, taskId]
@@ -1305,11 +1302,16 @@ app.post(
         });
       }
 
-      // 4️⃣ حفظ المهمة بحالة pending
       await pool.query(
         `INSERT INTO user_tasks 
-        (user_id, task_id, proof_image, status)
-        VALUES ($1, $2, $3, 'pending')`,
+         (user_id, task_id, status, completed_at)
+         VALUES ($1, $2, 'pending', NOW())`,
+        [req.userId, taskId]
+      );
+
+      await pool.query(
+        `INSERT INTO task_proofs (user_id, task_id, image_url)
+         VALUES ($1, $2, $3)`,
         [req.userId, taskId, req.file.filename]
       );
 
