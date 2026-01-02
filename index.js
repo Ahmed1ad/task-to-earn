@@ -365,16 +365,7 @@ const upload = multer({
   }
 });
 
-// فلترة الصور فقط
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image/")) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only images allowed"), false);
-  }
-};
 
-const upload = multer({ storage, fileFilter });
 
 
 
@@ -1290,9 +1281,9 @@ app.post(
 
       // 2️⃣ تأكد إن المهمة موجودة
       const taskResult = await pool.query(
-        "SELECT * FROM tasks WHERE id = $1 AND type = 'manual'",
-        [taskId]
-      );
+  "SELECT * FROM tasks WHERE id = $1 AND task_type = 'manual'",
+  [taskId]
+);
 
       if (!taskResult.rows.length) {
         return res.status(404).json({
