@@ -48,6 +48,32 @@ const pool = new Pool({
   }
 })();
 
+
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE tasks
+      ADD COLUMN IF NOT EXISTS task_type VARCHAR(20) DEFAULT 'auto'
+    `);
+    console.log("tasks.task_type ready ✅");
+  } catch (err) {
+    console.error("tasks.task_type error ❌", err);
+  }
+})();
+
+
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE user_tasks
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'started'
+    `);
+    console.log("user_tasks.status ready ✅");
+  } catch (err) {
+    console.error("user_tasks.status error ❌", err);
+  }
+})();
+
 // ===============================
 // Run once: add status column to user_tasks
 // ===============================
@@ -251,6 +277,26 @@ async function createWithdrawalsTable() {
     console.error('Error creating withdrawals ❌', err);
   }
 }
+
+
+
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS task_proofs (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        task_id INT NOT NULL,
+        image_url TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("task_proofs table ready ✅");
+  } catch (err) {
+    console.error("task_proofs error ❌", err);
+  }
+})();
 
 
 
