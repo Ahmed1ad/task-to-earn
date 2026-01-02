@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require("multer");
+const path = require("path");
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
@@ -341,20 +343,25 @@ app.use(async (req, res, next) => {
 })();
 
 
-
-const multer = require("multer");
-const path = require("path");
-
-// إعداد التخزين
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
     const uniqueName =
-      Date.now() + "-" + Math.round(Math.random() * 1e9) +
-      path.extname(file.originalname);
+      Date.now() + "-" + Math.round(Math.random() * 1e9) + path.extname(file.originalname);
     cb(null, uniqueName);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only images allowed"));
+    }
+    cb(null, true);
   }
 });
 
@@ -1270,64 +1277,61 @@ app.post(
   authMiddleware,
   upload.single("proof"),
   async (req, res) => {
-
-    if (!req.file) {
-      return res.status(400).json({
-        status: "error",
-        message: "No file uploaded"
-      });
-    }
-
-    res.json({
-      status: "success",
-      file: req.file.filename
-    });
-  }
-);
-
     try {
-      // تأكد إن المهمة Manual
-      const task = await pool.query(
-        "SELECT task_type FROM tasks WHERE id = $1",
-        [taskId]
-      );
+      const { taskId } = req.params;
 
-      if (!task.rows.length || task.rows[0].task_type !== "manual") {
+      // 1️⃣ تحقق من وجود ملف
+      if (!req.file) {
         return res.status(400).json({
           status: "error",
-          message: "Invalid manual task"
+          message: "يجب رفع صورة إثبات"
         });
       }
 
-      // سجل الإثبات
-      await pool.query(
-        `
-        INSERT INTO task_proofs (user_id, task_id, image_url)
-        VALUES ($1, $2, $3)
-        `,
-        [req.userId, taskId, req.file.path]
+      // 2️⃣ تأكد إن المهمة موجودة
+      const taskResult = await pool.query(
+        "SELECT * FROM tasks WHERE id = $1 AND type = 'manual'",
+        [taskId]
       );
 
-      // حدّث حالة المهمة إلى pending
-      await pool.query(
-        `
-        UPDATE user_tasks
-        SET status = 'pending'
-        WHERE user_id = $1 AND task_id = $2
-        `,
+      if (!taskResult.rows.length) {
+        return res.status(404).json({
+          status: "error",
+          message: "المهمة غير موجودة"
+        });
+      }
+
+      // 3️⃣ منع التكرار
+      const exists = await pool.query(
+        "SELECT 1 FROM user_tasks WHERE user_id=$1 AND task_id=$2",
         [req.userId, taskId]
+      );
+
+      if (exists.rows.length) {
+        return res.status(400).json({
+          status: "error",
+          message: "تم إرسال إثبات لهذه المهمة من قبل"
+        });
+      }
+
+      // 4️⃣ حفظ المهمة بحالة pending
+      await pool.query(
+        `INSERT INTO user_tasks 
+        (user_id, task_id, proof_image, status)
+        VALUES ($1, $2, $3, 'pending')`,
+        [req.userId, taskId, req.file.filename]
       );
 
       res.json({
         status: "success",
-        message: "Proof uploaded, task pending review"
+        message: "تم رفع الإثبات، في انتظار مراجعة الأدمن"
       });
 
     } catch (err) {
       console.error(err);
       res.status(500).json({
         status: "error",
-        message: "Upload failed"
+        message: "حدث خطأ أثناء رفع الإثبات"
       });
     }
   }
