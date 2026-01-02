@@ -1268,16 +1268,22 @@ app.post('/tasks/ads/fail/:taskId', authMiddleware, async (req, res) => {
 app.post(
   "/tasks/manual/upload/:taskId",
   authMiddleware,
-  upload.single("screenshot"),
+  upload.single("proof"),
   async (req, res) => {
-    const { taskId } = req.params;
 
     if (!req.file) {
       return res.status(400).json({
         status: "error",
-        message: "Screenshot is required"
+        message: "No file uploaded"
       });
     }
+
+    res.json({
+      status: "success",
+      file: req.file.filename
+    });
+  }
+);
 
     try {
       // تأكد إن المهمة Manual
