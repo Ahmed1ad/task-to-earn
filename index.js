@@ -342,6 +342,36 @@ app.use(async (req, res, next) => {
 
 
 
+const multer = require("multer");
+const path = require("path");
+
+// إعداد التخزين
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueName =
+      Date.now() + "-" + Math.round(Math.random() * 1e9) +
+      path.extname(file.originalname);
+    cb(null, uniqueName);
+  }
+});
+
+// فلترة الصور فقط
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only images allowed"), false);
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
+
+
+
 // ==============================
 // Routes
 // ==============================
@@ -1232,6 +1262,71 @@ app.post('/tasks/ads/fail/:taskId', authMiddleware, async (req, res) => {
     });
   }
 });
+
+
+
+app.post(
+  "/tasks/manual/upload/:taskId",
+  authMiddleware,
+  upload.single("screenshot"),
+  async (req, res) => {
+    const { taskId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({
+        status: "error",
+        message: "Screenshot is required"
+      });
+    }
+
+    try {
+      // تأكد إن المهمة Manual
+      const task = await pool.query(
+        "SELECT task_type FROM tasks WHERE id = $1",
+        [taskId]
+      );
+
+      if (!task.rows.length || task.rows[0].task_type !== "manual") {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid manual task"
+        });
+      }
+
+      // سجل الإثبات
+      await pool.query(
+        `
+        INSERT INTO task_proofs (user_id, task_id, image_url)
+        VALUES ($1, $2, $3)
+        `,
+        [req.userId, taskId, req.file.path]
+      );
+
+      // حدّث حالة المهمة إلى pending
+      await pool.query(
+        `
+        UPDATE user_tasks
+        SET status = 'pending'
+        WHERE user_id = $1 AND task_id = $2
+        `,
+        [req.userId, taskId]
+      );
+
+      res.json({
+        status: "success",
+        message: "Proof uploaded, task pending review"
+      });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        status: "error",
+        message: "Upload failed"
+      });
+    }
+  }
+);
+
 
 // ==============================
 // Start Server
