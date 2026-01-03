@@ -80,19 +80,6 @@ const pool = new Pool({
 })();
 
 
-INSERT INTO tasks
-(title, description, task_type, reward_points, is_active)
-VALUES
-(
-  'متابعة حساب انستجرام',
-  'قم بمتابعة الحساب وارفع لقطة شاشة تثبت المتابعة',
-  'manual',
-  20,
-  true
-);
-
-
-
 // ===============================
 // Run once: add status column to user_tasks
 // ===============================
@@ -1351,6 +1338,43 @@ app.post(
 );
 
 
+
+
+// ===============================
+// Create default manual task (run once safely)
+// ===============================
+async function createManualTaskIfNotExists() {
+  try {
+    const check = await pool.query(
+      "SELECT id FROM tasks WHERE task_type = 'manual' LIMIT 1"
+    );
+
+    if (check.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO tasks
+        (title, description, task_type, reward_points, is_active)
+        VALUES
+        (
+          'متابعة حساب انستجرام',
+          'قم بمتابعة الحساب وارفع لقطة شاشة تثبت المتابعة',
+          'manual',
+          20,
+          true
+        )
+      `);
+
+      console.log("✅ Manual task created");
+    } else {
+      console.log("ℹ️ Manual task already exists");
+    }
+  } catch (err) {
+    console.error("❌ Error creating manual task", err);
+  }
+}
+
+
+
+
 // ==============================
 // Start Server
 // ==============================
@@ -1362,6 +1386,7 @@ app.listen(PORT, () => {
   createUserTasksTable();
   createPointsHistoryTable();
   createWithdrawalsTable();
+  createManualTaskIfNotExists();
 });
 
 
