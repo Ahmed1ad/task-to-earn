@@ -10,7 +10,6 @@ const rateLimit = require('express-rate-limit');
 const fs = require("fs");
 
 const app = express();
-app.use('/uploads', express.static('uploads'));
 app.use(cors());
 app.set('trust proxy', 1);
 app.use(express.json());
@@ -1621,6 +1620,57 @@ async function createManualTaskIfNotExists() {
   }
 }
 
+
+
+
+app.get(
+  "/tasks/manual/proof/:proofId",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const { proofId } = req.params;
+
+      if (isNaN(proofId)) {
+        return res.status(400).json({
+          status: "error",
+          message: "رقم الإثبات غير صحيح"
+        });
+      }
+
+      const result = await pool.query(
+        `
+        SELECT image_url
+        FROM task_proofs
+        WHERE id = $1
+        `,
+        [proofId]
+      );
+
+      if (!result.rows.length) {
+        return res.status(404).json({
+          status: "error",
+          message: "الإثبات غير موجود"
+        });
+      }
+
+      const imagePath = path.join(
+        __dirname,
+        "uploads",
+        result.rows[0].image_url
+      );
+
+      res.sendFile(imagePath);
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        status: "error",
+        message: "فشل عرض الصورة"
+      });
+    }
+  }
+);
 
 
 
