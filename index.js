@@ -1340,43 +1340,50 @@ app.post(
 
 
 
+
 // ===============================
-// Create Manual Task (Admin only - later)
+// Admin: Create Manual Task
 // ===============================
-app.post("/tasks/manual/create", authMiddleware, async (req, res) => {
-  try {
+app.post(
+  '/tasks/manual/create',
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+
     const { title, description, reward_points } = req.body;
 
+    // ✅ Validation
     if (!title || !description || !reward_points) {
       return res.status(400).json({
-        status: "error",
-        message: "بيانات المهمة غير مكتملة"
+        status: 'error',
+        message: 'جميع الحقول مطلوبة'
       });
     }
 
-    const result = await pool.query(
-      `
-      INSERT INTO tasks
-      (title, description, task_type, reward_points, is_active)
-      VALUES ($1, $2, 'manual', $3, true)
-      RETURNING *
-      `,
-      [title, description, reward_points]
-    );
+    try {
+      const result = await pool.query(
+        `INSERT INTO tasks
+         (title, description, task_type, reward_points, is_active)
+         VALUES ($1, $2, 'manual', $3, true)
+         RETURNING *`,
+        [title, description, reward_points]
+      );
 
-    res.json({
-      status: "success",
-      task: result.rows[0]
-    });
+      res.json({
+        status: 'success',
+        message: 'تم إنشاء المهمة اليدوية بنجاح',
+        task: result.rows[0]
+      });
 
-  } catch (err) {
-    console.error("Create manual task error:", err);
-    res.status(500).json({
-      status: "error",
-      message: "Server error"
-    });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        status: 'error',
+        message: 'فشل إنشاء المهمة'
+      });
+    }
   }
-});
+);
 
 
 
