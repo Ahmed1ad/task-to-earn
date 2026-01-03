@@ -1341,6 +1341,47 @@ app.post(
 
 
 // ===============================
+// Create Manual Task (Admin only - later)
+// ===============================
+app.post("/tasks/manual/create", authMiddleware, async (req, res) => {
+  try {
+    const { title, description, reward_points } = req.body;
+
+    if (!title || !description || !reward_points) {
+      return res.status(400).json({
+        status: "error",
+        message: "بيانات المهمة غير مكتملة"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO tasks
+      (title, description, task_type, reward_points, is_active)
+      VALUES ($1, $2, 'manual', $3, true)
+      RETURNING *
+      `,
+      [title, description, reward_points]
+    );
+
+    res.json({
+      status: "success",
+      task: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error("Create manual task error:", err);
+    res.status(500).json({
+      status: "error",
+      message: "Server error"
+    });
+  }
+});
+
+
+
+
+// ===============================
 // Create default manual task (run once safely)
 // ===============================
 async function createManualTaskIfNotExists() {
