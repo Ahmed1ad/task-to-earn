@@ -379,6 +379,17 @@ const upload = multer({
 
 
 // ==============================
+// Serve uploaded proof images
+// ==============================
+app.use(
+  "/uploads",
+  authMiddleware,
+  adminMiddleware,
+  express.static("uploads")
+);
+
+
+// ==============================
 // Routes
 // ==============================
 app.get('/', (req, res) => {
