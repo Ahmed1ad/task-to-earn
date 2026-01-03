@@ -10,10 +10,11 @@ const rateLimit = require('express-rate-limit');
 const fs = require("fs");
 
 const app = express();
+app.use('/uploads', express.static('uploads'));
 app.use(cors());
 app.set('trust proxy', 1);
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+
 
 const tasksLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 دقيقة
