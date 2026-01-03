@@ -1389,6 +1389,45 @@ app.post(
 
 
 // ===============================
+// Get available manual tasks for user
+// ===============================
+app.get('/tasks/manual', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT t.id, t.title, t.description, t.reward_points
+      FROM tasks t
+      WHERE t.task_type = 'manual'
+        AND t.is_active = true
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_tasks ut
+          WHERE ut.user_id = $1
+            AND ut.task_id = t.id
+        )
+      ORDER BY t.created_at DESC
+      `,
+      [req.userId]
+    );
+
+    res.json({
+      status: 'success',
+      tasks: result.rows
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to load manual tasks'
+    });
+  }
+});
+
+
+
+
+// ===============================
 // Create default manual task (run once safely)
 // ===============================
 async function createManualTaskIfNotExists() {
