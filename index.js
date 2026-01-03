@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const rateLimit = require('express-rate-limit');
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
@@ -1423,6 +1424,154 @@ app.get('/tasks/manual', authMiddleware, async (req, res) => {
     });
   }
 });
+
+
+
+
+
+// ===============================
+// Admin - Get pending manual tasks
+// ===============================
+app.get(
+  "/admin/manual/pending",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT 
+          tp.id AS proof_id,
+          tp.image_url,
+          tp.created_at,
+          u.id AS user_id,
+          u.username,
+          t.id AS task_id,
+          t.title,
+          t.reward_points
+        FROM task_proofs tp
+        JOIN users u ON u.id = tp.user_id
+        JOIN tasks t ON t.id = tp.task_id
+        WHERE tp.status = 'pending'
+        ORDER BY tp.created_at ASC
+      `);
+
+      res.json({
+        status: "success",
+        proofs: result.rows
+      });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to load pending tasks"
+      });
+    }
+  }
+);
+
+
+
+// ===============================
+// Admin - Review manual task
+// ===============================
+app.post(
+  "/admin/manual/review",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    const { proofId, action, reason } = req.body;
+    // action = approve | reject
+
+    if (!proofId || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid data"
+      });
+    }
+
+    try {
+      const proofRes = await pool.query(
+        `
+        SELECT tp.*, t.reward_points
+        FROM task_proofs tp
+        JOIN tasks t ON t.id = tp.task_id
+        WHERE tp.id = $1
+        `,
+        [proofId]
+      );
+
+      if (!proofRes.rows.length) {
+        return res.status(404).json({
+          status: "error",
+          message: "Proof not found"
+        });
+      }
+
+      const proof = proofRes.rows[0];
+
+      // 📂 مسار الصورة
+      const imagePath = `uploads/${proof.image_url}`;
+
+      if (action === "approve") {
+        // ✅ تحديث الحالات
+        await pool.query(
+          `UPDATE task_proofs SET status='approved' WHERE id=$1`,
+          [proofId]
+        );
+
+        await pool.query(
+          `
+          UPDATE user_tasks
+          SET status='completed'
+          WHERE user_id=$1 AND task_id=$2
+          `,
+          [proof.user_id, proof.task_id]
+        );
+
+        await pool.query(
+          `UPDATE users SET points = points + $1 WHERE id=$2`,
+          [proof.reward_points, proof.user_id]
+        );
+
+      } else {
+        // ❌ رفض
+        await pool.query(
+          `UPDATE task_proofs SET status='rejected' WHERE id=$1`,
+          [proofId]
+        );
+
+        await pool.query(
+          `
+          UPDATE user_tasks
+          SET status='failed'
+          WHERE user_id=$1 AND task_id=$2
+          `,
+          [proof.user_id, proof.task_id]
+        );
+      }
+
+      // 🧹 حذف الصورة من السيرفر
+      fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
+
+      res.json({
+        status: "success",
+        message:
+          action === "approve"
+            ? "Task approved successfully"
+            : "Task rejected successfully",
+        reason: reason || null
+      });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        status: "error",
+        message: "Review failed"
+      });
+    }
+  }
+);
 
 
 
