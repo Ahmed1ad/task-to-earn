@@ -1311,16 +1311,22 @@ app.post(
       }
 
       const exists = await pool.query(
-        "SELECT 1 FROM user_tasks WHERE user_id=$1 AND task_id=$2",
-        [req.userId, taskId]
-      );
+  `
+  SELECT status 
+  FROM user_tasks 
+  WHERE user_id = $1 
+  AND task_id = $2
+  AND status IN ('pending', 'completed')
+  `,
+  [req.userId, taskId]
+);
 
-      if (exists.rows.length) {
-        return res.status(400).json({
-          status: "error",
-          message: "تم إرسال إثبات لهذه المهمة من قبل"
-        });
-      }
+if (exists.rows.length) {
+  return res.status(400).json({
+    status: "error",
+    message: "لا يمكنك إرسال إثبات لهذه المهمة حاليًا"
+  });
+}
 
       await pool.query(
         `INSERT INTO user_tasks 
