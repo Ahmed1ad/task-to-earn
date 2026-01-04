@@ -133,6 +133,20 @@ const pool = new Pool({
 })();
 
 
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS manual_task_proofs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    task_id INTEGER REFERENCES tasks(id),
+    proof_image TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT NOW()
+  )
+`);
+
+console.log("✅ manual_task_proofs table ready");
+
+
 // ==============================
 // Helpers
 // ==============================
