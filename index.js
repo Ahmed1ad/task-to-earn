@@ -978,7 +978,11 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
 
   // ❌ لو كان كملها قبل كده
   const viewed = await pool.query(
-    'SELECT 1 FROM user_ad_views WHERE user_id=$1 AND ad_id=$2',
+    'SELECT 1 
+FROM user_tasks 
+WHERE user_id=$1 
+AND task_id=$2 
+AND status IN ('pending','completed')',
     [req.userId, taskId]
   );
 
