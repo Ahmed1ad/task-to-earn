@@ -1283,111 +1283,6 @@ app.post('/tasks/ads/fail/:taskId', authMiddleware, async (req, res) => {
 
 
 
-app.post(
-  "/tasks/manual/upload/:taskId",
-  authMiddleware,
-  upload.single("proof"),
-  async (req, res) => {
-    try {
-      const { taskId } = req.params;
-
-      if (!req.file) {
-        return res.status(400).json({
-          status: "error",
-          message: "يجب رفع صورة إثبات"
-        });
-      }
-
-      // 1️⃣ التأكد إن المهمة يدوية
-      const taskResult = await pool.query(
-        "SELECT id FROM tasks WHERE id = $1 AND task_type = 'manual'",
-        [taskId]
-      );
-
-      if (!taskResult.rows.length) {
-        return res.status(404).json({
-          status: "error",
-          message: "المهمة غير موجودة أو ليست يدوية"
-        });
-      }
-
-      // 2️⃣ البحث عن محاولة سابقة
-      const existing = await pool.query(
-        `
-        SELECT id, status 
-        FROM user_tasks 
-        WHERE user_id = $1 AND task_id = $2
-        `,
-        [req.userId, taskId]
-      );
-
-      // 3️⃣ لو Pending أو Completed → ممنوع
-      if (
-        existing.rows.length &&
-        ["pending", "completed"].includes(existing.rows[0].status)
-      ) {
-        return res.status(400).json({
-          status: "error",
-          message: "لا يمكنك إرسال إثبات لهذه المهمة حاليًا"
-        });
-      }
-
-      // 4️⃣ لو Rejected → UPDATE
-      if (existing.rows.length && existing.rows[0].status === "rejected") {
-        await pool.query(
-          `
-          UPDATE user_tasks
-          SET status = 'pending',
-              updated_at = NOW()
-          WHERE id = $1
-          `,
-          [existing.rows[0].id]
-        );
-
-        await pool.query(
-          `
-          UPDATE task_proofs
-          SET image_url = $1,
-              updated_at = NOW()
-          WHERE user_id = $2 AND task_id = $3
-          `,
-          [req.file.filename, req.userId, taskId]
-        );
-      }
-
-      // 5️⃣ لو مفيش سجل → INSERT
-      if (!existing.rows.length) {
-        await pool.query(
-          `
-          INSERT INTO user_tasks (user_id, task_id, status)
-          VALUES ($1, $2, 'pending')
-          `,
-          [req.userId, taskId]
-        );
-
-        await pool.query(
-          `
-          INSERT INTO task_proofs (user_id, task_id, image_url)
-          VALUES ($1, $2, $3)
-          `,
-          [req.userId, taskId, req.file.filename]
-        );
-      }
-
-      res.json({
-        status: "success",
-        message: "تم رفع الإثبات، في انتظار مراجعة الأدمن"
-      });
-
-    } catch (err) {
-      console.error("❌ Upload manual task error:", err);
-      res.status(500).json({
-        status: "error",
-        message: "حدث خطأ أثناء رفع الإثبات"
-      });
-    }
-  }
-);
 
 
 
@@ -1435,6 +1330,114 @@ app.post(
     }
   }
 );
+
+
+
+app.post(
+  "/tasks/manual/upload/:taskId",
+  authMiddleware,
+  upload.single("proof"),
+  async (req, res) => {
+    try {
+      const { taskId } = req.params;
+
+      if (!req.file) {
+        return res.status(400).json({
+          status: "error",
+          message: "يجب رفع صورة إثبات"
+        });
+      }
+
+      // 1️⃣ تأكد أن المهمة موجودة ونوعها manual
+      const taskResult = await pool.query(
+        "SELECT id FROM tasks WHERE id = $1 AND task_type = 'manual'",
+        [taskId]
+      );
+
+      if (!taskResult.rows.length) {
+        return res.status(404).json({
+          status: "error",
+          message: "المهمة غير موجودة أو ليست يدوية"
+        });
+      }
+
+      // 2️⃣ جلب آخر حالة للمهمة لهذا المستخدم
+      const check = await pool.query(
+        `
+        SELECT status 
+        FROM user_tasks
+        WHERE user_id = $1 AND task_id = $2
+        ORDER BY updated_at DESC
+        LIMIT 1
+        `,
+        [req.userId, taskId]
+      );
+
+      // 3️⃣ منع التكرار (pending / completed)
+      if (check.rows.length) {
+        const status = check.rows[0].status;
+
+        if (status === "pending" || status === "completed") {
+          return res.status(400).json({
+            status: "error",
+            message: "لا يمكنك إرسال إثبات لهذه المهمة حاليًا"
+          });
+        }
+      }
+
+      // 4️⃣ لو كانت مرفوضة → نعيدها pending
+      if (check.rows.length && check.rows[0].status === "rejected") {
+        await pool.query(
+          `
+          UPDATE user_tasks
+          SET status = 'pending',
+              completed_at = NULL,
+              updated_at = NOW()
+          WHERE user_id = $1 AND task_id = $2
+          `,
+          [req.userId, taskId]
+        );
+      } else {
+        // أول مرة
+        await pool.query(
+          `
+          INSERT INTO user_tasks (user_id, task_id, status, created_at)
+          VALUES ($1, $2, 'pending', NOW())
+          `,
+          [req.userId, taskId]
+        );
+      }
+
+      // 5️⃣ حذف أي إثبات قديم
+      await pool.query(
+        "DELETE FROM task_proofs WHERE user_id = $1 AND task_id = $2",
+        [req.userId, taskId]
+      );
+
+      // 6️⃣ حفظ الإثبات الجديد
+      await pool.query(
+        `
+        INSERT INTO task_proofs (user_id, task_id, image_url)
+        VALUES ($1, $2, $3)
+        `,
+        [req.userId, taskId, req.file.filename]
+      );
+
+      res.json({
+        status: "success",
+        message: "تم رفع الإثبات، في انتظار مراجعة الأدمن"
+      });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        status: "error",
+        message: "حدث خطأ أثناء رفع الإثبات"
+      });
+    }
+  }
+);
+
 
 
 
