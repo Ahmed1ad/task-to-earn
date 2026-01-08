@@ -1359,15 +1359,15 @@ app.post(
 
       // 2️⃣ جلب آخر حالة للمهمة لهذا المستخدم
       const check = await pool.query(
-        `
-        SELECT status 
-        FROM user_tasks
-        WHERE user_id = $1 AND task_id = $2
-        ORDER BY updated_at DESC
-        LIMIT 1
-        `,
-        [req.userId, taskId]
-      );
+  `
+  SELECT status 
+  FROM user_tasks
+  WHERE user_id = $1 AND task_id = $2
+  ORDER BY started_at DESC
+  LIMIT 1
+  `,
+  [req.userId, taskId]
+);
 
       // 3️⃣ منع التكرار (pending / completed)
       if (check.rows.length) {
@@ -1563,7 +1563,9 @@ app.post(
       const proof = proofRes.rows[0];
 
       // 📂 مسار الصورة
-      const imagePath = `uploads/${proof.image_url}`;
+      if (proof.image_public_id) {
+  await cloudinary.uploader.destroy(proof.image_public_id);
+}
 
       if (action === "approve") {
         // ✅ تحديث الحالات
@@ -1593,15 +1595,16 @@ app.post(
           [proofId]
         );
 
-        await pool.query(
-          `
-          UPDATE user_tasks
-          SET status='failed'
-          WHERE user_id=$1 AND task_id=$2
-          `,
-          [proof.user_id, proof.task_id]
-        );
-      }
+        if (check.rows.length) {
+  const status = check.rows[0].status;
+
+  if (status === "pending" || status === "completed") {
+    return res.status(400).json({
+      status: "error",
+      message: "لا يمكنك إرسال إثبات لهذه المهمة حاليًا"
+    });
+  }
+}
 
       // 🧹 حذف الصورة من السيرفر
       fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
@@ -1668,15 +1671,23 @@ app.get(
   authMiddleware,
   adminMiddleware,
   async (req, res) => {
-    try {
-      const { proofId } = req.params;
+    const { proofId } = req.params;
 
-      if (isNaN(proofId)) {
-        return res.status(400).json({
-          status: "error",
-          message: "رقم الإثبات غير صحيح"
-        });
-      }
+    const result = await pool.query(
+      "SELECT image_url FROM task_proofs WHERE id=$1",
+      [proofId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        status: "error",
+        message: "الإثبات غير موجود"
+      });
+    }
+
+    res.redirect(result.rows[0].image_url);
+  }
+);
 
       const result = await pool.query(
         `
