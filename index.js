@@ -41,6 +41,15 @@ const pool = new Pool({
 });
 
 
+runMigrations()
+  .then(() => console.log("🚀 All migrations completed"))
+  .catch(err => {
+    console.error("❌ Migration failed", err);
+    process.exit(1);
+  });
+
+
+
 (async () => {
   try {
     await pool.query(`
@@ -1682,6 +1691,46 @@ app.get(
     res.redirect(result.rows[0].image_url);
   }
 );
+
+
+
+
+const fs = require("fs");
+const path = require("path");
+
+async function runMigrations() {
+  const migrationsDir = path.join(__dirname, "migrations");
+  const files = fs.readdirSync(migrationsDir).sort();
+
+  for (const file of files) {
+    const name = file;
+
+    const alreadyRun = await pool.query(
+      "SELECT 1 FROM migrations WHERE name = $1",
+      [name]
+    );
+
+    if (alreadyRun.rows.length) {
+      continue;
+    }
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDir, file),
+      "utf8"
+    );
+
+    console.log(`⚙️ Running migration: ${name}`);
+
+    await pool.query(sql);
+
+    await pool.query(
+      "INSERT INTO migrations (name) VALUES ($1)",
+      [name]
+    );
+
+    console.log(`✅ Migration applied: ${name}`);
+  }
+}
 
 
 
