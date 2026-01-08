@@ -1677,15 +1677,15 @@ app.get("/points/history", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
-         ph.points,
-         ph.type,
-         ph.reason,
-         ph.created_at,
-         t.title AS task_title
-       FROM points_history ph
-       LEFT JOIN tasks t ON ph.task_id = t.id
-       WHERE ph.user_id = $1
-       ORDER BY ph.created_at DESC`,
+  ph.points,
+  ph.type,
+  ph.reason,
+  ph.created_at,
+  t.title AS task_title
+FROM points_history ph
+LEFT JOIN tasks t ON ph.task_id = t.id
+WHERE ph.user_id = $1
+ORDER BY ph.created_at DESC`,
       [req.userId]
     );
 
