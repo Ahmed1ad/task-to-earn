@@ -215,101 +215,6 @@ function adminMiddleware(req, res, next) {
 }
 
 
-// ==============================
-// Create Tables
-// ==============================
-async function createUsersTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(50) UNIQUE NOT NULL,
-      email VARCHAR(100) UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      points INT DEFAULT 0,
-      balance DECIMAL(10,2) DEFAULT 0,
-      referral_code VARCHAR(20) UNIQUE,
-      referred_by INT,
-      is_banned BOOLEAN DEFAULT false,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-  console.log('Users table ready ✅');
-}
-
-async function createTasksTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      id SERIAL PRIMARY KEY,
-      title VARCHAR(100) NOT NULL,
-      description TEXT,
-      task_type VARCHAR(30) NOT NULL,
-      reward_points INT NOT NULL,
-      duration_seconds INT DEFAULT 0,
-      is_active BOOLEAN DEFAULT true,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-  console.log('Tasks table ready ✅');
-}
-
-async function createUserTasksTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_tasks (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL,
-      task_id INT NOT NULL,
-      status VARCHAR(20) DEFAULT 'started',
-      started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      completed_at TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (user_id, task_id)
-    );
-  `);
-  console.log('User tasks table ready ✅');
-}
-
-
-async function createPointsHistoryTable() {
-  const query = `
-    CREATE TABLE IF NOT EXISTS points_history (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL,
-      action VARCHAR(50) NOT NULL,
-      points INT NOT NULL,
-      related_id INT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `;
-  try {
-    await pool.query(query);
-    console.log('Points history table ready ✅');
-  } catch (err) {
-    console.error('Error creating points_history ❌', err);
-  }
-}
-
-
-async function createWithdrawalsTable() {
-  const query = `
-    CREATE TABLE IF NOT EXISTS withdrawals (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL,
-      amount_points INT NOT NULL,
-      method VARCHAR(30) NOT NULL,
-      wallet_or_number VARCHAR(100) NOT NULL,
-      status VARCHAR(20) DEFAULT 'pending',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `;
-  try {
-    await pool.query(query);
-    console.log('Withdrawals table ready ✅');
-  } catch (err) {
-    console.error('Error creating withdrawals ❌', err);
-  }
-}
-
 
 
 (async () => {
@@ -1739,11 +1644,6 @@ async function runMigrations() {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  createUsersTable();
-  createTasksTable();
-  createUserTasksTable();
-  createPointsHistoryTable();
-  createWithdrawalsTable();
   createManualTaskIfNotExists();
 });
 
