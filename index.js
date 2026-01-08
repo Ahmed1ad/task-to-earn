@@ -494,10 +494,12 @@ app.post('/withdraw/request', authMiddleware, async (req, res) => {
     );
 
     await client.query(
-      `INSERT INTO points_history (user_id, action, points)
-       VALUES ($1,'withdraw_request',$2)`,
-      [req.userId, -amount_points]
-    );
+  `
+  INSERT INTO points_history (user_id, points, type, reason)
+  VALUES ($1, $2, 'deduct', 'طلب سحب')
+  `,
+  [req.userId, -amount_points]
+);
 
     await client.query('COMMIT');
 
@@ -1676,16 +1678,18 @@ async function runMigrations() {
 app.get("/points/history", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT
-  ph.points,
-  ph.type,
-  ph.reason,
-  ph.created_at,
-  t.title AS task_title
-FROM points_history ph
-LEFT JOIN tasks t ON ph.task_id = t.id
-WHERE ph.user_id = $1
-ORDER BY ph.created_at DESC`,
+      `
+      SELECT
+        ph.points,
+        ph.type,
+        ph.reason,
+        ph.created_at,
+        t.title AS task_title
+      FROM points_history ph
+      LEFT JOIN tasks t ON ph.task_id = t.id
+      WHERE ph.user_id = $1
+      ORDER BY ph.created_at DESC
+      `,
       [req.userId]
     );
 
