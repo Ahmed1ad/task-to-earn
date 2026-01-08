@@ -1525,7 +1525,6 @@ app.post(
   adminMiddleware,
   async (req, res) => {
     const { proofId, action, reason } = req.body;
-    // action = approve | reject
 
     if (!proofId || !["approve", "reject"].includes(action)) {
       return res.status(400).json({
@@ -1535,6 +1534,7 @@ app.post(
     }
 
     try {
+      // 1️⃣ جلب الإثبات
       const proofRes = await pool.query(
         `
         SELECT tp.*, t.reward_points
@@ -1554,13 +1554,15 @@ app.post(
 
       const proof = proofRes.rows[0];
 
-      // 📂 مسار الصورة
+      // 2️⃣ حذف الصورة من Cloudinary
       if (proof.image_public_id) {
-  await cloudinary.uploader.destroy(proof.image_public_id);
-}
+        await cloudinary.uploader.destroy(proof.image_public_id);
+      }
 
+      // =====================
+      // ✅ APPROVE
+      // =====================
       if (action === "approve") {
-        // ✅ تحديث الحالات
         await pool.query(
           `UPDATE task_proofs SET status='approved' WHERE id=$1`,
           [proofId]
@@ -1569,7 +1571,7 @@ app.post(
         await pool.query(
           `
           UPDATE user_tasks
-          SET status='completed'
+          SET status='completed', completed_at=NOW()
           WHERE user_id=$1 AND task_id=$2
           `,
           [proof.user_id, proof.task_id]
@@ -1579,35 +1581,26 @@ app.post(
           `UPDATE users SET points = points + $1 WHERE id=$2`,
           [proof.reward_points, proof.user_id]
         );
+      }
 
-     // ❌ رفض
-await pool.query(
-  `UPDATE task_proofs SET status='rejected' WHERE id=$1`,
-  [proofId]
-);
+      // =====================
+      // ❌ REJECT
+      // =====================
+      if (action === "reject") {
+        await pool.query(
+          `UPDATE task_proofs SET status='rejected' WHERE id=$1`,
+          [proofId]
+        );
 
-await pool.query(
-  `
-  UPDATE user_tasks
-  SET status='rejected'
-  WHERE user_id=$1 AND task_id=$2
-  `,
-  [proof.user_id, proof.task_id]
-);
-
-        if (check.rows.length) {
-  const status = check.rows[0].status;
-
-  if (status === "pending" || status === "completed") {
-    return res.status(400).json({
-      status: "error",
-      message: "لا يمكنك إرسال إثبات لهذه المهمة حاليًا"
-    });
-  }
-}
-
-      // 🧹 حذف الصورة من السيرفر
-      fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
+        await pool.query(
+          `
+          UPDATE user_tasks
+          SET status='rejected'
+          WHERE user_id=$1 AND task_id=$2
+          `,
+          [proof.user_id, proof.task_id]
+        );
+      }
 
       res.json({
         status: "success",
