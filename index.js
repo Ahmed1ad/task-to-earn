@@ -1491,22 +1491,21 @@ app.post(
           [proofId]
         );
 
-        await pool.query(
-          `
-          UPDATE user_tasks
-          SET status='completed',
-              completed_at=NOW(),
-              updated_at=NOW()
-          WHERE user_id=$1 AND task_id=$2
-          `,
-          [proof.user_id, proof.task_id]
-        );
+         await pool.query(
+    `UPDATE user_tasks
+     SET status = 'completed', updated_at = NOW()
+     WHERE user_id = $1 AND task_id = $2`,
+    [proof.user_id, proof.task_id]
+  );
 
-        await pool.query(
-          `UPDATE users SET points = points + $1 WHERE id=$2`,
-          [proof.reward_points, proof.user_id]
-        );
-      }
+  // إضافة النقاط + تسجيلها
+  await addPoints({
+    userId: proof.user_id,
+    taskId: proof.task_id,
+    points: task.reward_points,
+    reason: "إتمام مهمة يدوية"
+  });
+}
 
       // =====================
       // ❌ REJECT
@@ -1553,6 +1552,25 @@ app.post(
 );
 
 
+
+
+async function addPoints({ userId, taskId = null, points, reason }) {
+  // 1️⃣ تحديث رصيد المستخدم
+  await pool.query(
+    `UPDATE users
+     SET points = points + $1
+     WHERE id = $2`,
+    [points, userId]
+  );
+
+  // 2️⃣ تسجيل العملية في السجل
+  await pool.query(
+    `INSERT INTO points_history
+     (user_id, task_id, points, type, reason)
+     VALUES ($1, $2, $3, 'earn', $4)`,
+    [userId, taskId, points, reason]
+  );
+}
 
 
 // ===============================
@@ -1652,6 +1670,37 @@ async function runMigrations() {
     console.log(`✅ Migration applied: ${name}`);
   }
 }
+
+
+
+app.get("/points/history", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         ph.points,
+         ph.type,
+         ph.reason,
+         ph.created_at,
+         t.title AS task_title
+       FROM points_history ph
+       LEFT JOIN tasks t ON ph.task_id = t.id
+       WHERE ph.user_id = $1
+       ORDER BY ph.created_at DESC`,
+      [req.userId]
+    );
+
+    res.json({
+      status: "success",
+      history: result.rows
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: "error",
+      message: "فشل تحميل سجل النقاط"
+    });
+  }
+});
 
 
 
