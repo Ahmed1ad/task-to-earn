@@ -252,9 +252,9 @@ async function createUserTasksTable() {
       status VARCHAR(20) DEFAULT 'started',
       started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       completed_at TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (user_id, task_id)
-      updated_at
-      created_at
     );
   `);
   console.log('User tasks table ready ✅');
