@@ -8,6 +8,8 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const rateLimit = require('express-rate-limit');
 const fs = require("fs");
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const app = express();
 app.use(cors());
@@ -143,7 +145,11 @@ function generateReferralCode() {
 
 
 
-
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_KEY,
+  api_secret: process.env.CLOUDINARY_SECRET
+});
 
 
 
@@ -356,28 +362,18 @@ app.use(async (req, res, next) => {
 })();
 
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueName =
-      Date.now() + "-" + Math.round(Math.random() * 1e9) + path.extname(file.originalname);
-    cb(null, uniqueName);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only images allowed"));
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'task_proofs',
+    allowed_formats: ['jpg', 'jpeg', 'png'],
+    public_id: (req, file) => {
+      return `proof_${req.userId}_${Date.now()}`;
     }
-    cb(null, true);
   }
 });
 
+const upload = multer({ storage });
 
 
 // ==============================
@@ -1415,14 +1411,17 @@ app.post(
       );
 
       // 6️⃣ حفظ الإثبات الجديد
-      await pool.query(
-        `
-        INSERT INTO task_proofs (user_id, task_id, image_url)
-        VALUES ($1, $2, $3)
-        `,
-        [req.userId, taskId, req.file.filename]
-      );
-
+     await pool.query(
+  `INSERT INTO task_proofs 
+   (user_id, task_id, image_url, image_public_id, status)
+   VALUES ($1, $2, $3, $4, 'pending')`,
+  [
+    req.userId,
+    taskId,
+    req.file.path,      // Cloudinary URL
+    req.file.filename  // public_id
+  ]
+);
       res.json({
         status: "success",
         message: "تم رفع الإثبات، في انتظار مراجعة الأدمن"
