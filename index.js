@@ -253,6 +253,8 @@ async function createUserTasksTable() {
       started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       completed_at TIMESTAMP,
       UNIQUE (user_id, task_id)
+      updated_at
+      created_at
     );
   `);
   console.log('User tasks table ready ✅');
@@ -375,16 +377,6 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-
-// ==============================
-// Serve uploaded proof images
-// ==============================
-app.use(
-  "/uploads",
-  authMiddleware,
-  adminMiddleware,
-  express.static("uploads")
-);
 
 
 // ==============================
@@ -1588,12 +1580,20 @@ app.post(
           [proof.reward_points, proof.user_id]
         );
 
-      } else {
-        // ❌ رفض
-        await pool.query(
-          `UPDATE task_proofs SET status='rejected' WHERE id=$1`,
-          [proofId]
-        );
+     // ❌ رفض
+await pool.query(
+  `UPDATE task_proofs SET status='rejected' WHERE id=$1`,
+  [proofId]
+);
+
+await pool.query(
+  `
+  UPDATE user_tasks
+  SET status='rejected'
+  WHERE user_id=$1 AND task_id=$2
+  `,
+  [proof.user_id, proof.task_id]
+);
 
         if (check.rows.length) {
   const status = check.rows[0].status;
@@ -1685,41 +1685,8 @@ app.get(
       });
     }
 
+    // تحويل مباشر لرابط Cloudinary
     res.redirect(result.rows[0].image_url);
-  }
-);
-
-      const result = await pool.query(
-        `
-        SELECT image_url
-        FROM task_proofs
-        WHERE id = $1
-        `,
-        [proofId]
-      );
-
-      if (!result.rows.length) {
-        return res.status(404).json({
-          status: "error",
-          message: "الإثبات غير موجود"
-        });
-      }
-
-      const imagePath = path.join(
-        __dirname,
-        "uploads",
-        result.rows[0].image_url
-      );
-
-      res.sendFile(imagePath);
-
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({
-        status: "error",
-        message: "فشل عرض الصورة"
-      });
-    }
   }
 );
 
