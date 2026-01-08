@@ -1250,9 +1250,9 @@ app.post(
         });
       }
 
-      // 1️⃣ تأكد أن المهمة موجودة ونوعها manual
+      // التأكد أن المهمة يدوية
       const taskResult = await pool.query(
-        "SELECT id FROM tasks WHERE id = $1 AND task_type = 'manual'",
+        "SELECT id FROM tasks WHERE id=$1 AND task_type='manual'",
         [taskId]
       );
 
@@ -1263,74 +1263,69 @@ app.post(
         });
       }
 
-      // 2️⃣ جلب آخر حالة للمهمة لهذا المستخدم
-      const check = await pool.query(
-  `
-  SELECT status 
-  FROM user_tasks
-  WHERE user_id = $1 AND task_id = $2
-  ORDER BY started_at DESC
-  LIMIT 1
-  `,
-  [req.userId, taskId]
-);
+      // جلب آخر حالة للمستخدم
+      const userTask = await pool.query(
+        `
+        SELECT status, attempt_count
+        FROM user_tasks
+        WHERE user_id=$1 AND task_id=$2
+        `,
+        [req.userId, taskId]
+      );
 
-      // 3️⃣ منع التكرار (pending / completed)
-      if (check.rows.length) {
-        const status = check.rows[0].status;
-
-        if (status === "pending" || status === "completed") {
-          return res.status(400).json({
-            status: "error",
-            message: "لا يمكنك إرسال إثبات لهذه المهمة حاليًا"
-          });
-        }
+      // لو المهمة مكتملة
+      if (userTask.rows[0]?.status === "completed") {
+        return res.status(400).json({
+          status: "error",
+          message: "لقد أكملت هذه المهمة بالفعل"
+        });
       }
 
-      // 4️⃣ لو كانت مرفوضة → نعيدها pending
-      if (check.rows.length && check.rows[0].status === "rejected") {
+      // لو رفض مرتين
+      if (
+        userTask.rows[0]?.status === "rejected" &&
+        userTask.rows[0]?.attempt_count >= 2
+      ) {
+        return res.status(403).json({
+          status: "error",
+          message: "تم رفض المهمة مرتين، لا يمكنك المحاولة مرة أخرى"
+        });
+      }
+
+      // تحديث أو إنشاء user_task
+      if (userTask.rows.length) {
         await pool.query(
           `
           UPDATE user_tasks
-          SET status = 'pending',
-              completed_at = NULL,
+          SET status='pending',
+              attempt_count = attempt_count + 1,
               updated_at = NOW()
-          WHERE user_id = $1 AND task_id = $2
+          WHERE user_id=$1 AND task_id=$2
           `,
           [req.userId, taskId]
         );
       } else {
-        // أول مرة
         await pool.query(
           `
-          INSERT INTO user_tasks (user_id, task_id, status, created_at)
-          VALUES ($1, $2, 'pending', NOW())
+          INSERT INTO user_tasks (user_id, task_id, status, attempt_count)
+          VALUES ($1, $2, 'pending', 1)
           `,
           [req.userId, taskId]
         );
       }
 
-      // 5️⃣ حذف أي إثبات قديم
+      // حفظ الإثبات
       await pool.query(
-        "DELETE FROM task_proofs WHERE user_id = $1 AND task_id = $2",
-        [req.userId, taskId]
+        `
+        INSERT INTO task_proofs (user_id, task_id, image_url, status)
+        VALUES ($1, $2, $3, 'pending')
+        `,
+        [req.userId, taskId, req.file.path || req.file.filename]
       );
 
-      // 6️⃣ حفظ الإثبات الجديد
-     await pool.query(
-  `INSERT INTO task_proofs 
-   (user_id, task_id, image_url, image_public_id, status)
-   VALUES ($1, $2, $3, $4, 'pending')`,
-  [
-    req.userId,
-    taskId,
-    req.file.path,      // Cloudinary URL
-    req.file.filename  // public_id
-  ]
-);
       res.json({
         status: "success",
-        message: "تم رفع الإثبات، في انتظار مراجعة الأدمن"
+        message: "تم إرسال الإثبات، في انتظار مراجعة الأدمن"
       });
 
     } catch (err) {
@@ -1443,18 +1438,29 @@ app.post(
     if (!proofId || !["approve", "reject"].includes(action)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid data"
+        message: "بيانات غير صحيحة"
       });
     }
 
     try {
-      // 1️⃣ جلب الإثبات
+      // 1️⃣ جلب بيانات الإثبات + المهمة
       const proofRes = await pool.query(
         `
-        SELECT tp.*, t.reward_points
+        SELECT 
+          tp.id,
+          tp.user_id,
+          tp.task_id,
+          tp.image_public_id,
+          ut.attempt_count,
+          t.reward_points
         FROM task_proofs tp
-        JOIN tasks t ON t.id = tp.task_id
+        JOIN user_tasks ut 
+          ON ut.user_id = tp.user_id 
+         AND ut.task_id = tp.task_id
+        JOIN tasks t 
+          ON t.id = tp.task_id
         WHERE tp.id = $1
+          AND tp.status = 'pending'
         `,
         [proofId]
       );
@@ -1462,54 +1468,67 @@ app.post(
       if (!proofRes.rows.length) {
         return res.status(404).json({
           status: "error",
-          message: "Proof not found"
+          message: "الإثبات غير موجود أو تمت مراجعته من قبل"
         });
       }
 
       const proof = proofRes.rows[0];
 
-      // 2️⃣ حذف الصورة من Cloudinary
+      // 2️⃣ حذف الصورة من Cloudinary (في الحالتين)
       if (proof.image_public_id) {
         await cloudinary.uploader.destroy(proof.image_public_id);
       }
 
-      // =====================
+      // ======================
       // ✅ APPROVE
-      // =====================
+      // ======================
       if (action === "approve") {
+        // تحديث حالة الإثبات
         await pool.query(
           `UPDATE task_proofs SET status='approved' WHERE id=$1`,
           [proofId]
         );
 
+        // تحديث حالة المهمة
         await pool.query(
           `
           UPDATE user_tasks
-          SET status='completed', completed_at=NOW()
+          SET status='completed',
+              completed_at=NOW(),
+              updated_at=NOW()
           WHERE user_id=$1 AND task_id=$2
           `,
           [proof.user_id, proof.task_id]
         );
 
+        // إضافة النقاط
         await pool.query(
           `UPDATE users SET points = points + $1 WHERE id=$2`,
           [proof.reward_points, proof.user_id]
         );
       }
 
-      // =====================
+      // ======================
       // ❌ REJECT
-      // =====================
+      // ======================
       if (action === "reject") {
+        // تحديث حالة الإثبات
         await pool.query(
-          `UPDATE task_proofs SET status='rejected' WHERE id=$1`,
-          [proofId]
+          `
+          UPDATE task_proofs
+          SET status='rejected',
+              rejection_reason=$1
+          WHERE id=$2
+          `,
+          [reason || null, proofId]
         );
 
+        // 🔴 هنا السطر المهم اللي سألت عنه
         await pool.query(
           `
           UPDATE user_tasks
-          SET status='rejected'
+          SET status='rejected',
+              updated_at=NOW()
           WHERE user_id=$1 AND task_id=$2
           `,
           [proof.user_id, proof.task_id]
@@ -1520,16 +1539,15 @@ app.post(
         status: "success",
         message:
           action === "approve"
-            ? "Task approved successfully"
-            : "Task rejected successfully",
-        reason: reason || null
+            ? "تم قبول المهمة وإضافة النقاط"
+            : "تم رفض المهمة"
       });
 
     } catch (err) {
       console.error(err);
       res.status(500).json({
         status: "error",
-        message: "Review failed"
+        message: "فشل مراجعة المهمة"
       });
     }
   }
