@@ -1695,8 +1695,7 @@ app.get(
 
 
 
-const fs = require("fs");
-const path = require("path");
+
 
 async function runMigrations() {
   const migrationsDir = path.join(__dirname, "migrations");
