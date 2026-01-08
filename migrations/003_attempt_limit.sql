@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE user_tasks
+ADD COLUMN IF NOT EXISTS attempt_count INT DEFAULT 1;
+
+COMMIT;
