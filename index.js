@@ -1675,18 +1675,19 @@ async function runMigrations() {
 
 
 
+
 app.get("/points/history", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
       `
       SELECT
+        ph.id,
         ph.points,
-        ph.type,
-        ph.reason,
+        ph.action,
         ph.created_at,
         t.title AS task_title
       FROM points_history ph
-      LEFT JOIN tasks t ON ph.task_id = t.id
+      LEFT JOIN tasks t ON t.id = ph.task_id
       WHERE ph.user_id = $1
       ORDER BY ph.created_at DESC
       `,
@@ -1698,13 +1699,14 @@ app.get("/points/history", authMiddleware, async (req, res) => {
       history: result.rows
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Points history error:", err);
     res.status(500).json({
       status: "error",
       message: "فشل تحميل سجل النقاط"
     });
   }
 });
+
 
 
 
