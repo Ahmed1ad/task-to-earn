@@ -437,6 +437,16 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       [reward_points, req.userId]
     );
 
+
+    await pool.query(
+  `
+  INSERT INTO points_history
+  (user_id, task_id, points, action, related_id)
+  VALUES ($1, $2, $3, 'earn', $4)
+  `,
+  [userId, taskId, reward, null]
+);
+
     res.json({
       status: 'success',
       reward_points
