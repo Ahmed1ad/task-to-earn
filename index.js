@@ -1509,6 +1509,22 @@ app.post(
   });
 }
 
+
+      await pool.query(
+  `
+  INSERT INTO points_history
+  (user_id, task_id, points, action, related_id)
+  VALUES ($1, $2, $3, 'earn', $4)
+  `,
+  [
+    userId,
+    taskId,
+    task.reward_points,
+    proofId
+  ]
+);
+      
+
       // =====================
       // ❌ REJECT
       // =====================
