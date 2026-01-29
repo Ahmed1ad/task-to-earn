@@ -277,7 +277,8 @@ function adminMiddleware(req, res, next) {
     await pool.query(`
       ALTER TABLE points_history 
       ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'manual',
-      ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT ''
+      ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT '',
+      ALTER COLUMN action DROP NOT NULL
     `);
 
     console.log('points_history table ready ✅');
