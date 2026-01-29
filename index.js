@@ -238,6 +238,39 @@ function adminMiddleware(req, res, next) {
 })();
 
 
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS withdrawals (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        amount_points INT NOT NULL,
+        method VARCHAR(50) NOT NULL,
+        wallet_or_number VARCHAR(100) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('withdrawals table ready ✅');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS points_history (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        points INT NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('points_history table ready ✅');
+
+  } catch (err) {
+    console.error('Error creating withdrawals/points_history tables ❌', err);
+  }
+})();
+
+
 
 app.use(async (req, res, next) => {
   try {
@@ -508,6 +541,7 @@ app.post('/withdraw/request', authMiddleware, async (req, res) => {
     res.json({ status: 'success', message: 'Withdrawal request submitted' });
 
   } catch (err) {
+    console.error('Withdrawal Request Error ❌', err);
     await client.query('ROLLBACK');
     res.status(500).json({ status: 'error', message: 'Withdrawal failed' });
   } finally {
@@ -543,8 +577,8 @@ app.post('/admin/withdrawals/:id/action', authMiddleware, adminMiddleware, async
     );
 
     await pool.query(
-      `INSERT INTO points_history (user_id, action, points)
-       VALUES ($1, 'withdraw_rejected', $2)`,
+      `INSERT INTO points_history (user_id, type, reason, points)
+       VALUES ($1, 'refund', 'سحب مرفوض', $2)`,
       [wd.rows[0].user_id, wd.rows[0].amount_points]
     );
   }
