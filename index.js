@@ -596,6 +596,66 @@ app.get('/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) 
 });
 
 
+// ===============================
+// Admin - Dashboard Stats
+// ===============================
+app.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const usersCount = await pool.query('SELECT COUNT(*) FROM users');
+    const tasksCount = await pool.query('SELECT COUNT(*) FROM tasks WHERE is_active = true');
+    const withdrawalsPending = await pool.query("SELECT COUNT(*) FROM withdrawals WHERE status = 'pending'");
+    const totalPoints = await pool.query('SELECT SUM(points) FROM users');
+
+    res.json({
+      status: 'success',
+      stats: {
+        total_users: parseInt(usersCount.rows[0].count),
+        active_tasks: parseInt(tasksCount.rows[0].count),
+        pending_withdrawals: parseInt(withdrawalsPending.rows[0].count),
+        total_points_distributed: parseInt(totalPoints.rows[0].sum) || 0
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: 'Stats failed' });
+  }
+});
+
+
+// ===============================
+// Admin - Users Management
+// ===============================
+app.get('/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, username, email, points, is_banned, last_ip, created_at
+      FROM users
+      ORDER BY created_at DESC
+      LIMIT 100
+    `);
+    res.json({ status: 'success', users: result.rows });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: 'Fetch users failed' });
+  }
+});
+
+app.post('/admin/users/:id/ban', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await pool.query('UPDATE users SET is_banned = true WHERE id = $1', [req.params.id]);
+    res.json({ status: 'success', message: 'User banned' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: 'Ban failed' });
+  }
+});
+
+app.post('/admin/users/:id/unban', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await pool.query('UPDATE users SET is_banned = false WHERE id = $1', [req.params.id]);
+    res.json({ status: 'success', message: 'User unbanned' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: 'Unban failed' });
+  }
+});
+
 
 app.get('/tasks/my', authMiddleware, async (req, res) => {
   try {
