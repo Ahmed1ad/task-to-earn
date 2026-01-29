@@ -67,6 +67,7 @@ runMigrations()
 })();
 
 
+
 (async () => {
   try {
     await pool.query(`
@@ -199,7 +200,7 @@ async function authMiddleware(req, res, next) {
 
 
 function adminMiddleware(req, res, next) {
-  const ADMIN_EMAIL = 'ad45821765@gmail.com'; // غيّرها بإيميلك
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ad45821765@gmail.com';
 
   pool.query(
     'SELECT email FROM users WHERE id=$1',
@@ -338,16 +339,16 @@ app.post('/auth/login', async (req, res) => {
     return res.status(401).json({ status: 'error', message: 'Invalid login' });
 
 
-// 📌 جلب IP المستخدم
-const ip =
-  req.headers['x-forwarded-for']?.split(',')[0] ||
-  req.socket.remoteAddress;
+  // 📌 جلب IP المستخدم
+  const ip =
+    req.headers['x-forwarded-for']?.split(',')[0] ||
+    req.socket.remoteAddress;
 
-// 💾 تخزين IP في حساب المستخدم
-await pool.query(
-  'UPDATE users SET last_ip = $1 WHERE id = $2',
-  [ip, user.id]
-);
+  // 💾 تخزين IP في حساب المستخدم
+  await pool.query(
+    'UPDATE users SET last_ip = $1 WHERE id = $2',
+    [ip, user.id]
+  );
   const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.json({ status: 'success', token });
 });
@@ -437,16 +438,6 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       [reward_points, req.userId]
     );
 
-
-    await pool.query(
-  `
-  INSERT INTO points_history
-  (user_id, task_id, points, action, related_id)
-  VALUES ($1, $2, $3, 'earn', $4)
-  `,
-  [userId, taskId, reward, null]
-);
-
     res.json({
       status: 'success',
       reward_points
@@ -504,12 +495,12 @@ app.post('/withdraw/request', authMiddleware, async (req, res) => {
     );
 
     await client.query(
-  `
+      `
   INSERT INTO points_history (user_id, points, type, reason)
   VALUES ($1, $2, 'deduct', 'طلب سحب')
   `,
-  [req.userId, -amount_points]
-);
+      [req.userId, -amount_points]
+    );
 
     await client.query('COMMIT');
 
@@ -645,39 +636,39 @@ app.post('/admin/set-task-duration',
   authMiddleware,
   adminMiddleware,
   async (req, res) => {
-  const { taskId, duration } = req.body;
+    const { taskId, duration } = req.body;
 
-if (isNaN(taskId)) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'رقم المهمة غير صحيح'
+    if (isNaN(taskId)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'رقم المهمة غير صحيح'
+      });
+    }
+
+    if (!taskId || !duration) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'taskId and duration are required'
+      });
+    }
+
+    await pool.query(
+      'UPDATE tasks SET duration_seconds = $1 WHERE id = $2',
+      [duration, taskId]
+    );
+
+    res.json({
+      status: 'success',
+      message: `Task ${taskId} duration updated to ${duration} seconds`
     });
-  }
-
-  if (!taskId || !duration) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'taskId and duration are required'
-    });
-  }
-
-  await pool.query(
-    'UPDATE tasks SET duration_seconds = $1 WHERE id = $2',
-    [duration, taskId]
-  );
-
-  res.json({
-    status: 'success',
-    message: `Task ${taskId} duration updated to ${duration} seconds`
   });
-});
 
 
 
 // ⚠️ TEMP: Reset task for testing
 app.post('/admin/reset-user-task', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, taskId } = req.body;
-  
+
   if (isNaN(taskId)) {
     return res.status(400).json({
       status: 'error',
@@ -890,10 +881,10 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
     });
   }
 
- const viewed = await pool.query(
-  "SELECT 1 FROM user_tasks WHERE user_id=$1 AND task_id=$2 AND status IN ('pending','completed')",
-  [req.userId, taskId]
-);
+  const viewed = await pool.query(
+    "SELECT 1 FROM user_tasks WHERE user_id=$1 AND task_id=$2 AND status IN ('pending','completed')",
+    [req.userId, taskId]
+  );
 
   if (viewed.rows.length) {
     return res.status(400).json({
@@ -925,7 +916,7 @@ app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
 
 
 
-  app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
+app.get('/tasks/ads/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
 
   const result = await pool.query(
@@ -1503,37 +1494,21 @@ app.post(
           [proofId]
         );
 
-         await pool.query(
-    `UPDATE user_tasks
+        await pool.query(
+          `UPDATE user_tasks
      SET status = 'completed', updated_at = NOW()
      WHERE user_id = $1 AND task_id = $2`,
-    [proof.user_id, proof.task_id]
-  );
+          [proof.user_id, proof.task_id]
+        );
 
-  // إضافة النقاط + تسجيلها
-  await addPoints({
-    userId: proof.user_id,
-    taskId: proof.task_id,
-    points: task.reward_points,
-    reason: "إتمام مهمة يدوية"
-  });
-}
-
-
-      await pool.query(
-  `
-  INSERT INTO points_history
-  (user_id, task_id, points, action, related_id)
-  VALUES ($1, $2, $3, 'earn', $4)
-  `,
-  [
-    userId,
-    taskId,
-    task.reward_points,
-    proofId
-  ]
-);
-      
+        // إضافة النقاط + تسجيلها
+        await addPoints({
+          userId: proof.user_id,
+          taskId: proof.task_id,
+          points: proof.reward_points,
+          reason: "إتمام مهمة يدوية"
+        });
+      }
 
       // =====================
       // ❌ REJECT
@@ -1701,19 +1676,18 @@ async function runMigrations() {
 
 
 
-
 app.get("/points/history", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
       `
       SELECT
-        ph.id,
         ph.points,
-        ph.action,
+        ph.type,
+        ph.reason,
         ph.created_at,
         t.title AS task_title
       FROM points_history ph
-      LEFT JOIN tasks t ON t.id = ph.task_id
+      LEFT JOIN tasks t ON ph.task_id = t.id
       WHERE ph.user_id = $1
       ORDER BY ph.created_at DESC
       `,
@@ -1725,14 +1699,13 @@ app.get("/points/history", authMiddleware, async (req, res) => {
       history: result.rows
     });
   } catch (err) {
-    console.error("❌ Points history error:", err);
+    console.error(err);
     res.status(500).json({
       status: "error",
       message: "فشل تحميل سجل النقاط"
     });
   }
 });
-
 
 
 
