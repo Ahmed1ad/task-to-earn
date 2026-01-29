@@ -251,6 +251,15 @@ function adminMiddleware(req, res, next) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Ensure columns exist (Migration fix)
+    await pool.query(`
+      ALTER TABLE withdrawals 
+      ADD COLUMN IF NOT EXISTS method VARCHAR(50) DEFAULT 'unknown',
+      ADD COLUMN IF NOT EXISTS wallet_or_number VARCHAR(100) DEFAULT 'unknown',
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending'
+    `);
+
     console.log('withdrawals table ready ✅');
 
     await pool.query(`
@@ -263,6 +272,14 @@ function adminMiddleware(req, res, next) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Ensure columns exist (Migration fix)
+    await pool.query(`
+      ALTER TABLE points_history 
+      ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'manual',
+      ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT ''
+    `);
+
     console.log('points_history table ready ✅');
 
   } catch (err) {
