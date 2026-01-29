@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8" />
+<title>Admin Dashboard</title>
+
+<style>
+body {
+  margin:0;
+  font-family: Arial;
+  background:#0f172a;
+  color:white;
+}
+
+header {
+  padding:15px;
+  background:#020617;
+  text-align:center;
+  font-size:20px;
+}
+
+.container {
+  display:grid;
+  grid-template-columns:250px 1fr;
+  height:100vh;
+}
+
+aside {
+  background:#020617;
+  padding:15px;
+}
+
+aside button {
+  width:100%;
+  margin-bottom:10px;
+  padding:10px;
+  background:#1e293b;
+  border:none;
+  color:white;
+  cursor:pointer;
+}
+
+aside button:hover {
+  background:#334155;
+}
+
+main {
+  padding:20px;
+  overflow:auto;
+}
+
+.card {
+  background:#020617;
+  padding:15px;
+  margin-bottom:15px;
+  border-radius:8px;
+}
+
+img {
+  max-width:200px;
+  border-radius:5px;
+}
+</style>
+</head>
+
+<body>
+
+<header>🚀 Task To Earn – Admin Dashboard</header>
+
+<div class="container">
+
+<aside>
+<button onclick="loadUsers()">👤 Users</button>
+<button onclick="loadManual()">🖐 Manual Tasks</button>
+<button onclick="loadWithdrawals()">💰 Withdrawals</button>
+</aside>
+
+<main id="content"></main>
+
+</div>
+
+<script>
+
+const API = "https://task-to-earn.onrender.com";
+const TOKEN = prompt("Paste Admin Token");
+
+async function api(path, method="GET", body=null){
+  const res = await fetch(API+path,{
+    method,
+    headers:{
+      "Authorization":"Bearer "+TOKEN,
+      "Content-Type":"application/json"
+    },
+    body: body ? JSON.stringify(body):null
+  });
+  return res.json();
+}
+
+// USERS
+async function loadUsers(){
+ const data = await api("/admin/users");
+ let html="";
+ data.users.forEach(u=>{
+ html+=`
+ <div class="card">
+ ${u.username} – ${u.email}<br>
+ banned: ${u.is_banned}
+ </div>`;
+ });
+ document.getElementById("content").innerHTML=html;
+}
+
+// MANUAL
+async function loadManual(){
+ const data = await api("/admin/manual/pending");
+ let html="";
+ data.proofs.forEach(p=>{
+ html+=`
+ <div class="card">
+ ${p.username}<br>
+ ${p.title}<br>
+ <img src="${p.image_url}"><br><br>
+
+ <button onclick="review(${p.proof_id},'approve')">✅ Approve</button>
+ <button onclick="review(${p.proof_id},'reject')">❌ Reject</button>
+ </div>`;
+ });
+ document.getElementById("content").innerHTML=html;
+}
+
+async function review(id,action){
+ await api("/admin/manual/review","POST",{proofId:id,action});
+ loadManual();
+}
+
+// Withdrawals
+async function loadWithdrawals(){
+ const data = await api("/admin/withdrawals");
+ let html="";
+ data.withdrawals.forEach(w=>{
+ html+=`
+ <div class="card">
+ ${w.username}<br>
+ ${w.amount_points} pts<br>
+ ${w.status}<br>
+ <button onclick="wd(${w.id},'approve')">Approve</button>
+ <button onclick="wd(${w.id},'reject')">Reject</button>
+ </div>`;
+ });
+ document.getElementById("content").innerHTML=html;
+}
+
+async function wd(id,action){
+ await api("/admin/withdrawals/"+id+"/action","POST",{action});
+ loadWithdrawals();
+}
+
+</script>
+
+</body>
+</html>
