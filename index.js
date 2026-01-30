@@ -415,6 +415,24 @@ app.get('/me', authMiddleware, async (req, res) => {
   res.json({ status: 'success', user: user.rows[0] });
 });
 
+app.get('/auth/check', authMiddleware, async (req, res) => {
+  const user = await pool.query(
+    `SELECT id,username,email,points,balance,referral_code,created_at
+     FROM users WHERE id=$1`,
+    [req.userId]
+  );
+  if (!user.rows.length) {
+    return res.status(404).json({ status: 'error', message: 'User not found' });
+  }
+  // Check ban status again explicitly (though middleware does it)
+  const isBanned = await pool.query('SELECT is_banned FROM users WHERE id=$1', [req.userId]);
+  if (isBanned.rows[0]?.is_banned) {
+    return res.json({ status: 'banned', message: 'User is banned' });
+  }
+
+  res.json({ status: 'success', user: user.rows[0] });
+});
+
 
 app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
@@ -501,6 +519,108 @@ app.post('/tasks/ads/complete/:taskId', authMiddleware, async (req, res) => {
       status: 'error',
       message: 'Failed to complete task'
     });
+  }
+});
+
+
+app.post('/tasks/ads/start/:taskId', authMiddleware, async (req, res) => {
+  const { taskId } = req.params;
+
+  try {
+    // Check if task exists and is active
+    const taskCheck = await pool.query('SELECT id FROM tasks WHERE id = $1', [taskId]);
+    if (!taskCheck.rows.length) {
+      return res.status(404).json({ status: 'error', message: 'Task not found' });
+    }
+
+    // Upsert user_task status to 'started'
+    // If it already exists (e.g. user clicked before but didn't finish), update start time
+    await pool.query(`
+      INSERT INTO user_tasks (user_id, task_id, status, started_at)
+      VALUES ($1, $2, 'started', NOW())
+      ON CONFLICT (user_id, task_id) 
+      DO UPDATE SET status = 'started', started_at = NOW()
+      WHERE user_tasks.status != 'completed'
+    `, [req.userId, taskId]);
+
+    res.json({ status: 'success', message: 'Task started' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to start task' });
+  }
+});
+
+app.post('/tasks/ads/fail/:taskId', authMiddleware, async (req, res) => {
+  // Optional: You might want to log failure or reset status
+  // For now we just acknowledge it.
+  res.json({ status: 'success', message: 'Task marked failed/cancelled locally' });
+});
+
+
+// Endpoint to list AD tasks (auto)
+app.get('/tasks/ads', authMiddleware, async (req, res) => {
+  try {
+    // Return all active auto tasks
+    // Frontend filters out completed ones, or we can filter here using LEFT JOIN
+    const result = await pool.query(`
+      SELECT id, title, description, reward_points, duration_seconds, ad_url, task_type
+      FROM tasks
+      WHERE is_active = true AND (task_type = 'auto' OR task_type = 'ad' OR task_type IS NULL)
+      ORDER BY id DESC
+    `);
+    res.json({ status: 'success', tasks: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch tasks' });
+  }
+});
+
+// Endpoint to list MANUAL tasks
+app.get('/tasks/manual', authMiddleware, async (req, res) => {
+  try {
+    // Return all active manual tasks
+    const result = await pool.query(`
+      SELECT id, title, description, reward_points, task_type
+      FROM tasks
+      WHERE is_active = true AND task_type = 'manual'
+      ORDER BY id DESC
+    `);
+    res.json({ status: 'success', tasks: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch manual tasks' });
+  }
+});
+
+// Endpoint to upload proof for MANUAL tasks
+app.post('/tasks/manual/upload/:taskId', authMiddleware, upload.single('proof'), async (req, res) => {
+  const { taskId } = req.params;
+
+  if (!req.file) {
+    return res.status(400).json({ status: 'error', message: 'No file uploaded' });
+  }
+
+  try {
+    const imageUrl = req.file.path; // Cloudinary URL
+
+    // 1. Insert into task_proofs
+    await pool.query(`
+      INSERT INTO task_proofs (user_id, task_id, image_url, status)
+      VALUES ($1, $2, $3, 'pending')
+    `, [req.userId, taskId, imageUrl]);
+
+    // 2. Mark user_task as pending (or insert if not exists)
+    await pool.query(`
+      INSERT INTO user_tasks (user_id, task_id, status, started_at, completed_at)
+      VALUES ($1, $2, 'pending', NOW(), NOW())
+      ON CONFLICT (user_id, task_id)
+      DO UPDATE SET status = 'pending', completed_at = NOW(), started_at = NOW()
+    `, [req.userId, taskId]);
+
+    res.json({ status: 'success', message: 'Proof uploaded successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Upload failed' });
   }
 });
 
