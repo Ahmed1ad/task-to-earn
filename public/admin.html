@@ -530,7 +530,7 @@
 
             if (data && data.tasks) {
                 data.tasks.forEach(t => {
-                    const isAuto = t.task_type === 'auto' || !t.task_type;
+                    const isAuto = t.task_type === 'auto' || t.task_type === 'watch_ad' || !t.task_type;
                     tbody.innerHTML += `
                         <tr class="hover:bg-gray-50 transition">
                             <td class="p-4">
@@ -541,7 +541,7 @@
                             <td class="p-4 font-bold text-gray-800">${t.title}</td>
                             <td class="p-4 font-bold text-secondary">+${t.reward_points}</td>
                             <td class="p-4 text-xs text-gray-500 max-w-xs truncate">
-                                ${isAuto ? `Duration: ${t.duration_seconds}s` : 'Proof Image'}
+                                ${isAuto ? `Duration: ${t.duration_seconds}s` : 'Manual Task'}
                             </td>
                             <td class="p-4">
                                 <button onclick="deleteTask(${t.id})" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><i class="fas fa-trash"></i></button>
@@ -583,7 +583,8 @@
         }
 
         async function loadProofs() {
-            const data = await fetchAuth('/admin/manual-tasks/pending');
+            // UPDATED: Using correct endpoint
+            const data = await fetchAuth('/admin/manual/pending');
             const container = document.getElementById('proofs-container');
             const empty = document.getElementById('no-proofs');
 
@@ -596,12 +597,14 @@
             empty.classList.add('hidden');
 
             data.proofs.forEach(p => {
+                // p: { proof_id, username, task_title, reward_points, image_url, ... }
+                // Note: Index.js returns `proof_id`, not `id` for the proof itself.
                 container.innerHTML += `
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
                         <div class="flex items-center justify-between pb-2 border-b border-gray-50">
                             <div>
                                 <p class="font-bold text-sm text-gray-800">${p.username}</p>
-                                <p class="text-xs text-gray-400">Task: ${p.task_title}</p>
+                                <p class="text-xs text-gray-400">Task: ${p.title}</p>
                             </div>
                             <span class="font-black text-secondary text-lg">+${p.reward_points}</span>
                         </div>
@@ -611,8 +614,8 @@
                             </a>
                         </div>
                         <div class="flex gap-2 mt-auto pt-2">
-                            <button onclick="actionProof(${p.id}, 'approve')" class="flex-1 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 shadow transition">قبول</button>
-                            <button onclick="actionProof(${p.id}, 'reject')" class="flex-1 py-2 bg-red-100 text-red-600 rounded-lg font-bold hover:bg-red-200 transition">رفض</button>
+                            <button onclick="actionProof(${p.proof_id}, 'approve')" class="flex-1 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 shadow transition">قبول</button>
+                            <button onclick="actionProof(${p.proof_id}, 'reject')" class="flex-1 py-2 bg-red-100 text-red-600 rounded-lg font-bold hover:bg-red-200 transition">رفض</button>
                         </div>
                     </div>
                 `;
@@ -621,16 +624,19 @@
 
         /* --- ACTIONS --- */
         async function toggleTaskFields() {
-            // Always show all fields as requested by user
-            // But we can update labels or hints if needed
             const type = document.getElementById('new-task-type').value;
             const urlLabel = document.querySelector('#field-url label');
+            const urlInput = document.getElementById('new-task-url');
+            const durationField = document.getElementById('field-duration');
 
             if (type === 'manual') {
-                urlLabel.innerText = "رابط المهمة (مثل قناة تيليجرام)";
-                // document.getElementById('field-duration').classList.add('hidden'); // User said duration is required, so keep it
+                urlLabel.innerText = "رابط المهمة (اختياري / انستجرام الخ)";
+                urlInput.placeholder = "مثال: رابط القناة أو الحساب";
+                durationField.classList.add('hidden');
             } else {
                 urlLabel.innerText = "رابط الإعلان (Auto Only)";
+                urlInput.placeholder = "https://...";
+                durationField.classList.remove('hidden');
             }
         }
         function openTaskModal() {
@@ -639,22 +645,37 @@
         }
 
         async function createTask() {
-            const body = {
-                task_type: document.getElementById('new-task-type').value,
-                title: document.getElementById('new-task-title').value,
-                description: document.getElementById('new-task-desc').value,
-                reward_points: document.getElementById('new-task-points').value,
-                duration_seconds: document.getElementById('new-task-duration').value,
-                ad_url: document.getElementById('new-task-url').value,
-            };
+            const type = document.getElementById('new-task-type').value;
+            const title = document.getElementById('new-task-title').value;
+            const description = document.getElementById('new-task-desc').value;
+            const reward_points = document.getElementById('new-task-points').value;
 
-            // VALIDATION
-            if (!body.title || !body.reward_points || !body.duration_seconds || !body.ad_url) {
-                alert('جميع الحقول مطلوبة (العنوان، النقاط، المدة، الرابط)');
+            // Auto Fields
+            const duration_seconds = document.getElementById('new-task-duration').value;
+            const ad_url = document.getElementById('new-task-url').value;
+
+            if (!title || !reward_points) {
+                alert('العنوان والنقاط حقول مطلوبة');
                 return;
             }
 
-            const res = await fetchAuth('/admin/add-task', { method: 'POST', body: JSON.stringify(body) });
+            let endpoint = '/admin/add-task'; // Default (Auto)
+            let body = {};
+
+            if (type === 'manual') {
+                endpoint = '/tasks/manual/create'; // UPDATED: Correct endpoint for manual
+                body = { title, description, reward_points };
+            } else {
+                if (!duration_seconds || !ad_url) {
+                    alert('الرابط والمدة مطلوبة للمهام التلقائية');
+                    return;
+                }
+                body = {
+                    title, description, reward_points, duration_seconds, ad_url, task_type: 'watch_ad'
+                };
+            }
+
+            const res = await fetchAuth(endpoint, { method: 'POST', body: JSON.stringify(body) });
             if (res.status === 'success') {
                 document.getElementById('task-modal').classList.add('hidden');
                 loadTasks();
@@ -700,12 +721,20 @@
         }
 
         async function actionProof(id, action) {
+            let reason = '';
+            if (action === 'reject') {
+                reason = prompt('سجل سبب الرفض (اختياري):') || '';
+            }
             if (!confirm(action === 'approve' ? 'قبول الإثبات ومنح النقاط؟' : 'رفض الإثبات؟')) return;
-            await fetchAuth(`/admin/manual-tasks/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) });
+
+            // UPDATED: Correct endpoint
+            await fetchAuth(`/admin/manual/review`, {
+                method: 'POST',
+                body: JSON.stringify({ proofId: id, action, reason })
+            });
             loadProofs();
             loadStats();
         }
-
     </script>
 </body>
 
