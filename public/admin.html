@@ -4,483 +4,410 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | Task to Earn</title>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>لوحة التحكم | Task to Earn</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg-dark: #1a1a2e;
-            --bg-card: #16213e;
-            --primary: #4ecca3;
-            --danger: #e94560;
-            --text-main: #eeeeee;
-            --text-muted: #a0a0a0;
-            --border: #2a2a40;
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        primary: '#4F46E5', // Indigo-600
+                        secondary: '#10B981', // Emerald-500
+                        danger: '#EF4444' // Red-500
+                    }
+                }
+            }
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Tajawal', sans-serif;
+    </script>
+    <style>
+        .sidebar-active {
+            background-color: rgba(79, 70, 229, 0.1);
+            color: #4F46E5;
+            border-right: 3px solid #4F46E5;
         }
 
         body {
-            background: var(--bg-dark);
-            color: var(--text-main);
-            font-size: 16px;
-            display: flex;
-            min-height: 100vh;
-            overflow-x: hidden;
+            background-color: #F3F4F6;
         }
 
-        /* Sidebar */
-        .sidebar {
-            width: 260px;
-            background: var(--bg-card);
-            border-left: 1px solid var(--border);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            height: 100vh;
-            right: 0;
-            top: 0;
-            z-index: 100;
-            transition: transform 0.3s;
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
         }
 
-        .sidebar h2 {
-            color: var(--primary);
-            text-align: center;
-            margin-bottom: 40px;
-            font-size: 24px;
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 3px;
         }
 
-        .nav-item {
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: var(--text-muted);
-        }
-
-        .nav-item:hover,
-        .nav-item.active {
-            background: rgba(78, 204, 163, 0.1);
-            color: var(--primary);
-        }
-
-        .nav-item i {
-            width: 20px;
-            text-align: center;
-        }
-
-        /* Main Content */
-        .main-content {
-            margin-right: 260px;
-            flex: 1;
-            padding: 30px;
-            width: 100%;
-            transition: margin 0.3s;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .page-title {
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        .logout-btn {
-            background: var(--danger);
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: var(--bg-card);
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card h3 {
-            color: var(--text-muted);
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .card .value {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .card i {
-            position: absolute;
-            left: 20px;
-            bottom: 20px;
-            font-size: 40px;
-            opacity: 0.1;
-            color: var(--text-main);
-        }
-
-        /* Tables */
-        .table-container {
-            background: var(--bg-card);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 800px;
-        }
-
-        th,
-        td {
-            padding: 15px 20px;
-            text-align: right;
-            border-bottom: 1px solid var(--border);
-        }
-
-        th {
-            background: rgba(0, 0, 0, 0.2);
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        tr:hover {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .status-badge {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-        }
-
-        .status-pending {
-            background: rgba(255, 193, 7, 0.15);
-            color: #ffc107;
-        }
-
-        .status-approved {
-            background: rgba(78, 204, 163, 0.15);
-            color: var(--primary);
-        }
-
-        .status-rejected {
-            background: rgba(233, 69, 96, 0.15);
-            color: var(--danger);
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: 0.2s;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: #1a1a2e;
-            font-weight: 600;
-        }
-
-        .btn-danger {
-            background: rgba(233, 69, 96, 0.2);
-            color: var(--danger);
-        }
-
-        .btn-success {
-            background: rgba(78, 204, 163, 0.2);
-            color: var(--primary);
-        }
-
-        .btn:hover {
-            opacity: 0.8;
-        }
-
-        /* Forms */
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: white;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 200;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--bg-card);
-            padding: 30px;
-            border-radius: 12px;
-            width: 400px;
-            max-width: 90%;
-        }
-
-        /* Utility */
-        .hidden {
-            display: none;
-        }
-
-        .mr-2 {
-            margin-left: 10px;
-        }
-
-        /* RTL margin */
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(100%);
-                width: 240px;
-            }
-
-            .sidebar.open {
-                transform: translateX(0);
-            }
-
-            .main-content {
-                margin-right: 0;
-                padding: 20px;
-            }
-
-            .menu-toggle {
-                display: block !important;
-            }
-        }
-
-        .menu-toggle {
-            display: none;
-            font-size: 24px;
-            cursor: pointer;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
         }
     </style>
 </head>
 
-<body>
-
-    <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <h2>لوحة التحكم ⚡</h2>
-        <div class="nav-item active" onclick="showSection('stats')">
-            <i class="fas fa-chart-line"></i> الإحصائيات
-        </div>
-        <div class="nav-item" onclick="showSection('withdrawals')">
-            <i class="fas fa-wallet"></i> السحوبات
-        </div>
-        <div class="nav-item" onclick="showSection('tasks')">
-            <i class="fas fa-tasks"></i> إدارة المهام
-        </div>
-        <div class="nav-item" onclick="showSection('users')">
-            <i class="fas fa-users"></i> المستخدمين
-        </div>
-        <div style="margin-top: auto;">
-            <div class="nav-item" onclick="logout()" style="color: var(--danger);">
-                <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="header">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
-                <h1 class="page-title" id="pageTitle">الإحصائيات العامة</h1>
-            </div>
-            <div id="user-info">Admin</div>
-        </div>
-
-        <!-- Sections -->
-        <div id="stats-section">
-            <div class="stats-grid">
-                <div class="card">
-                    <h3>إجمالي المستخدمين</h3>
-                    <div class="value" id="stat-users">0</div>
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="card">
-                    <h3>المهام النشطة</h3>
-                    <div class="value" id="stat-tasks">0</div>
-                    <i class="fas fa-list-check"></i>
-                </div>
-                <div class="card">
-                    <h3>طلبات السحب المعلقة</h3>
-                    <div class="value" id="stat-withdrawals">0</div>
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="card">
-                    <h3>النقاط الموزعة</h3>
-                    <div class="value" id="stat-points">0</div>
-                    <i class="fas fa-coins"></i>
-                </div>
-            </div>
-        </div>
-
-        <div id="withdrawals-section" class="hidden">
-            <div class="table-container">
-                <table id="withdrawals-table">
-                    <thead>
-                        <tr>
-                            <th>المستخدم</th>
-                            <th>المبلغ</th>
-                            <th>الطريقة</th>
-                            <th>المحفظة</th>
-                            <th>الحالة</th>
-                            <th>التاريخ</th>
-                            <th>إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody><!-- Populated by JS --></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="tasks-section" class="hidden">
-            <div style="margin-bottom: 20px;">
-                <button class="btn btn-primary" onclick="openAddTaskModal()">+ إضافة مهمة جديدة</button>
-            </div>
-            <div class="table-container">
-                <table id="tasks-table">
-                    <thead>
-                        <tr>
-                            <th>العنوان</th>
-                            <th>النقاط</th>
-                            <th>المدة (ث)</th>
-                            <th>الحالة</th>
-                            <th>إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody><!-- Populated by JS --></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="users-section" class="hidden">
-            <div class="table-container">
-                <table id="users-table">
-                    <thead>
-                        <tr>
-                            <th>المعرف</th>
-                            <th>اسم المستخدم</th>
-                            <th>البريد</th>
-                            <th>النقاط</th>
-                            <th>حالة الحظر</th>
-                            <th>إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody><!-- Populated by JS --></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+<body class="text-gray-800">
 
     <!-- Login Modal -->
-    <div id="login-modal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 20px; text-align: center;">تسجيل دخول الأدمن</h2>
-            <div class="form-group">
-                <input type="email" id="login-email" class="form-control" placeholder="البريد الإلكتروني">
-            </div>
-            <div class="form-group">
-                <input type="password" id="login-password" class="form-control" placeholder="كلمة المرور">
-            </div>
-            <button class="btn btn-primary" style="width: 100%; padding: 10px;" onclick="login()">دخول</button>
-            <p id="login-error" style="color: var(--danger); margin-top: 10px; text-align: center;"></p>
+    <div id="login-modal"
+        class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl relative">
+            <h2 class="text-2xl font-bold text-center mb-6 text-gray-800">تسجيل دخول المشرف</h2>
+            <form onsubmit="event.preventDefault(); login();">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>
+                        <input type="email" id="login-email"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition"
+                            required placeholder="admin@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
+                        <input type="password" id="login-password"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition"
+                            required placeholder="••••••••">
+                    </div>
+                    <button type="submit"
+                        class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg active:scale-95">
+                        دخول للوحة التحكم
+                    </button>
+                    <p id="login-error" class="text-red-500 text-center text-sm font-bold mt-2"></p>
+                </div>
+            </form>
         </div>
     </div>
 
+    <!-- Layout -->
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-l border-gray-100 hidden md:flex flex-col z-20 shadow-xl">
+            <div class="p-6 border-b border-gray-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-primary flex items-center justify-center">
+                    <i class="fas fa-shield-alt text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-lg text-gray-800 tracking-tight">لوحة الإدارة</h1>
+                    <p class="text-xs text-gray-400 font-semibold">System Admin v2.0</p>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <button onclick="showSection('stats')" id="nav-stats"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition font-bold sidebar-active">
+                    <i class="fas fa-chart-pie w-5"></i> الإحصائيات
+                </button>
+                <button onclick="showSection('tasks')" id="nav-tasks"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition font-bold">
+                    <i class="fas fa-tasks w-5"></i> إدارة المهام
+                </button>
+                <button onclick="showSection('proofs')" id="nav-proofs"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition font-bold">
+                    <i class="fas fa-check-circle w-5"></i> مراجعة الإثباتات
+                    <span id="proofs-badge"
+                        class="mr-auto bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full hidden">0</span>
+                </button>
+                <button onclick="showSection('withdrawals')" id="nav-withdrawals"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition font-bold">
+                    <i class="fas fa-wallet w-5"></i> طلبات السحب
+                    <span id="withdrawals-badge"
+                        class="mr-auto bg-amber-100 text-amber-600 text-xs px-2 py-0.5 rounded-full hidden">0</span>
+                </button>
+                <button onclick="showSection('users')" id="nav-users"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition font-bold">
+                    <i class="fas fa-users w-5"></i> المستخدمين
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-100">
+                <button onclick="logout()"
+                    class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 font-bold transition">
+                    <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto relative">
+            <header
+                class="bg-white border-b border-gray-100 h-16 flex items-center justify-between px-6 sticky top-0 z-10">
+                <h2 class="font-bold text-xl text-gray-800" id="page-title">نظرة عامة</h2>
+                <div class="text-sm font-semibold text-gray-500 bg-gray-50 px-3 py-1 rounded-lg">
+                    Admin Access
+                </div>
+            </header>
+
+            <div class="p-6 max-w-7xl mx-auto space-y-6">
+
+                <!-- STATS SECTION -->
+                <div id="section-stats" class="content-section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl">
+                                <i class="fas fa-users"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-400 font-bold">إجمالي المستخدمين</p>
+                                <p class="text-2xl font-black text-gray-800" id="stat-users">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl">
+                                <i class="fas fa-check-circle"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-400 font-bold">مهام مكتملة</p>
+                                <p class="text-2xl font-black text-gray-800" id="stat-points">0</p>
+                                <p class="text-xs text-gray-400">نقطة موزعة</p>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-2xl">
+                                <i class="fas fa-clock"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-400 font-bold">سحوبات معلقة</p>
+                                <p class="text-2xl font-black text-gray-800" id="stat-withdrawals">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                            <div
+                                class="w-14 h-14 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center text-2xl">
+                                <i class="fas fa-file-image"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-400 font-bold">إثباتات للمراجعة</p>
+                                <p class="text-2xl font-black text-gray-800" id="stat-proofs">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USERS SECTION -->
+                <div id="section-users" class="content-section hidden space-y-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex-1 relative">
+                                <i class="fas fa-search absolute right-4 top-3.5 text-gray-400"></i>
+                                <input type="text" id="user-search"
+                                    placeholder="بحث باسم المستخدم أو البريد الإلكتروني..."
+                                    class="w-full pr-10 pl-4 py-3 rounded-xl border border-gray-200 outline-none focus:border-primary">
+                            </div>
+                            <button onclick="loadUsers()"
+                                class="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800">بحث</button>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right" id="users-table">
+                                <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
+                                    <tr>
+                                        <th class="p-4 rounded-r-xl">ID</th>
+                                        <th class="p-4">المستخدم</th>
+                                        <th class="p-4">النقاط</th>
+                                        <th class="p-4">الحالة</th>
+                                        <th class="p-4">IP</th>
+                                        <th class="p-4 rounded-l-xl">إجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50 text-sm font-semibold text-gray-700">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TASKS SECTION -->
+                <div id="section-tasks" class="content-section hidden space-y-6">
+                    <div class="flex justify-end">
+                        <button onclick="openTaskModal()"
+                            class="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition">
+                            <i class="fas fa-plus"></i> مهمة جديدة
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table class="w-full text-right" id="tasks-table">
+                            <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
+                                <tr>
+                                    <th class="p-4">نوع المهمة</th>
+                                    <th class="p-4">العنوان</th>
+                                    <th class="p-4">المكافأة</th>
+                                    <th class="p-4">المتطلبات</th>
+                                    <th class="p-4">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50 text-sm font-semibold text-gray-700">
+                                <!-- Populated JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PROOFS SECTION -->
+                <div id="section-proofs" class="content-section hidden space-y-6">
+                    <div id="proofs-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        <!-- Populated JS -->
+                    </div>
+                    <div id="no-proofs" class="hidden text-center py-20 text-gray-400">
+                        <i class="fas fa-check-circle text-6xl mb-4 opacity-20"></i>
+                        <p class="font-bold">لا توجد إثباتات معلقة للمراجعة</p>
+                    </div>
+                </div>
+
+                <!-- WITHDRAWALS SECTION -->
+                <div id="section-withdrawals" class="content-section hidden space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table class="w-full text-right" id="withdrawals-table">
+                            <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
+                                <tr>
+                                    <th class="p-4">المستخدم</th>
+                                    <th class="p-4">المبلغ</th>
+                                    <th class="p-4">بطاقة / محفظة</th>
+                                    <th class="p-4">الحالة</th>
+                                    <th class="p-4">التاريخ</th>
+                                    <th class="p-4">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50 text-sm font-semibold text-gray-700">
+                                <!-- JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
     <!-- Add Task Modal -->
-    <div id="task-modal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 20px;">إضافة مهمة جديدة</h2>
-            <div class="form-group">
-                <input type="text" id="task-title" class="form-control" placeholder="عنوان المهمة">
+    <div id="task-modal"
+        class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-scale-in">
+            <h3 class="text-xl font-bold mb-4">إضافة مهمة جديدة</h3>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">نوع المهمة</label>
+                        <select id="new-task-type"
+                            class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                            onchange="toggleTaskFields()">
+                            <option value="auto">تلقائي (مشاهدة)</option>
+                            <option value="manual">يدوي (رفع إثبات)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">عدد النقاط</label>
+                        <input type="number" id="new-task-points"
+                            class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                            placeholder="مثال: 50">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">عنوان المهمة</label>
+                    <input type="text" id="new-task-title"
+                        class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">وصف المهمة</label>
+                    <textarea id="new-task-desc"
+                        class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                        rows="2"></textarea>
+                </div>
+
+                <!-- Variable Fields -->
+                <div id="field-auto-url">
+                    <label class="text-xs font-bold text-gray-500 uppercase">رابط الإعلان (Auto Only)</label>
+                    <input type="text" id="new-task-url"
+                        class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                        placeholder="https://...">
+                </div>
+                <div id="field-auto-duration">
+                    <label class="text-xs font-bold text-gray-500 uppercase">مدة المشاهدة (ثواني)</label>
+                    <input type="number" id="new-task-duration"
+                        class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                        value="30">
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4">
+                    <button onclick="document.getElementById('task-modal').classList.add('hidden')"
+                        class="px-4 py-2 rounded-xl font-bold text-gray-500 hover:bg-gray-100">إلغاء</button>
+                    <button onclick="createTask()"
+                        class="px-6 py-2 rounded-xl bg-primary text-white font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200">حفظ
+                        ونشر</button>
+                </div>
             </div>
-            <div class="form-group">
-                <input type="number" id="task-points" class="form-control" placeholder="عدد النقاط">
-            </div>
-            <div class="form-group">
-                <input type="number" id="task-duration" class="form-control" placeholder="المدة بالثواني">
-            </div>
-            <div class="form-group">
-                <input type="text" id="task-url" class="form-control" placeholder="رابط الإعلان (Ad URL)">
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button class="btn"
-                    onclick="document.getElementById('task-modal').classList.remove('active')">إلغاء</button>
-                <button class="btn btn-primary" onclick="createTask()">حفظ</button>
+        </div>
+    </div>
+
+    <!-- Point Edit Modal -->
+    <div id="points-modal"
+        class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-scale-in">
+            <h3 class="text-xl font-bold mb-4">تعديل رصيد المستخدم</h3>
+            <input type="hidden" id="edit-user-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">عدد النقاط (سالب للخصم)</label>
+                    <input type="number" id="edit-points-val"
+                        class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                        placeholder="مثال: 100 أو -50">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">السبب</label>
+                    <input type="text" id="edit-points-reason"
+                        class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
+                        placeholder="مكافأة، خصم مخالفة...">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button onclick="document.getElementById('points-modal').classList.add('hidden')"
+                        class="px-4 py-2 rounded-xl font-bold text-gray-500 hover:bg-gray-100">إلغاء</button>
+                    <button onclick="submitPointEdit()"
+                        class="px-6 py-2 rounded-xl bg-primary text-white font-bold hover:bg-indigo-700">تحديث</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        /* ================= LOGIC ================= */
         const API_URL = '';
         let token = localStorage.getItem('token');
+        let currentSection = 'stats';
 
-        // Initial Check
-        if (!token) {
-            document.getElementById('login-modal').classList.add('active');
-        } else {
-            loadDashboard();
+        function showSection(id) {
+            document.querySelectorAll('.content-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`section-${id}`).classList.remove('hidden');
+
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('sidebar-active', 'bg-indigo-50', 'text-primary'));
+            const btn = document.getElementById(`nav-${id}`);
+            if (btn) btn.classList.add('sidebar-active');
+
+            const titles = { stats: 'الإحصائيات العامة', tasks: 'إدارة المهام', proofs: 'مراجعة الإثباتات', withdrawals: 'طلبات السحب', users: 'إدارة المستخدمين' };
+            document.getElementById('page-title').innerText = titles[id] || 'لوحة التحكم';
+
+            currentSection = id;
+            loadDataForSection(id);
         }
 
+        async function loadDataForSection(id) {
+            if (id === 'stats') loadStats();
+            if (id === 'users') loadUsers();
+            if (id === 'tasks') loadTasks();
+            if (id === 'withdrawals') loadWithdrawals();
+            if (id === 'proofs') loadProofs();
+        }
+
+        /* --- AUTH --- */
         async function login() {
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+            errEl.innerText = '';
 
             try {
                 const res = await fetch('/auth/login', {
@@ -489,73 +416,135 @@
                     body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
-
                 if (data.status === 'success') {
                     token = data.token;
                     localStorage.setItem('token', token);
-                    document.getElementById('login-modal').classList.remove('active');
-                    loadDashboard();
+                    document.getElementById('login-modal').classList.add('hidden');
+                    loadStats();
                 } else {
-                    document.getElementById('login-error').innerText = data.message;
+                    errEl.innerText = data.message || 'فشل الدخول';
                 }
-            } catch (err) {
-                document.getElementById('login-error').innerText = 'خطأ في الاتصال';
+            } catch (e) { errEl.innerText = 'خطأ اتصال'; }
+        }
+
+        // Auto check
+        (async function init() {
+            if (!token) {
+                document.getElementById('login-modal').classList.remove('hidden');
+            } else {
+                // Verify token validity quickly
+                try {
+                    const res = await fetch('/admin/stats', { headers: { Authorization: `Bearer ${token}` } });
+                    if (res.status === 401 || res.status === 403) {
+                        localStorage.removeItem('token');
+                        location.reload();
+                    } else {
+                        loadStats();
+                    }
+                } catch (e) { }
             }
-        }
+        })();
 
-        function logout() {
-            localStorage.removeItem('token');
-            location.reload();
-        }
-
-        async function fetchAuth(url, options = {}) {
+        /* --- API HELPERS --- */
+        async function fetchAuth(endpoint, options = {}) {
             options.headers = { ...options.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
-            const res = await fetch(url, options);
+            const res = await fetch(endpoint, options);
             if (res.status === 401 || res.status === 403) {
-                logout();
+                localStorage.removeItem('token');
+                location.reload();
                 return null;
             }
             return res.json();
         }
 
-        function showSection(id) {
-            document.querySelectorAll('.main-content > div[id$="-section"]').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`${id}-section`).classList.remove('hidden');
+        function logout() { localStorage.removeItem('token'); location.reload(); }
 
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            event.currentTarget.classList.add('active'); // approximation
-
-            const titles = {
-                'stats': 'الإحصائيات العامة',
-                'withdrawals': 'إدارة السحوبات',
-                'tasks': 'إدارة المهام',
-                'users': 'إدارة المستخدمين'
-            };
-            document.getElementById('pageTitle').innerText = titles[id];
-
-            if (id === 'stats') loadStats();
-            if (id === 'withdrawals') loadWithdrawals();
-            if (id === 'tasks') loadTasks();
-            if (id === 'users') loadUsers();
-        }
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-        }
-
-        // --- Loaders ---
-
-        async function loadDashboard() {
-            loadStats();
-        }
-
+        /* --- LOADERS --- */
         async function loadStats() {
             const data = await fetchAuth('/admin/stats');
             if (data && data.stats) {
                 document.getElementById('stat-users').innerText = data.stats.total_users;
-                document.getElementById('stat-tasks').innerText = data.stats.active_tasks;
-                document.getElementById('stat-withdrawals').innerText = data.stats.pending_withdrawals;
                 document.getElementById('stat-points').innerText = data.stats.total_points_distributed;
+                document.getElementById('stat-withdrawals').innerText = data.stats.pending_withdrawals;
+                document.getElementById('stat-proofs').innerText = data.stats.pending_proofs;
+
+                // Update Badges
+                if (data.stats.pending_proofs > 0) {
+                    const b = document.getElementById('proofs-badge');
+                    b.innerText = data.stats.pending_proofs;
+                    b.classList.remove('hidden');
+                }
+                if (data.stats.pending_withdrawals > 0) {
+                    const b = document.getElementById('withdrawals-badge');
+                    b.innerText = data.stats.pending_withdrawals;
+                    b.classList.remove('hidden');
+                }
+            }
+        }
+
+        async function loadUsers() {
+            const search = document.getElementById('user-search').value;
+            const url = search ? `/admin/users?search=${encodeURIComponent(search)}` : '/admin/users';
+            const data = await fetchAuth(url);
+
+            const tbody = document.querySelector('#users-table tbody');
+            tbody.innerHTML = '';
+
+            if (data && data.users) {
+                data.users.forEach(u => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-4 rounded-r-xl text-gray-400 font-mono">#${u.id}</td>
+                            <td class="p-4">
+                                <p class="font-bold text-gray-900">${u.username}</p>
+                                <p class="text-xs text-gray-400">${u.email}</p>
+                            </td>
+                            <td class="p-4 font-bold text-secondary">${u.points}</td>
+                            <td class="p-4">
+                                ${u.is_banned
+                            ? '<span class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-bold">محظور</span>'
+                            : '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-bold">نشط</span>'}
+                            </td>
+                            <td class="p-4 text-xs font-mono text-gray-400">${u.last_ip || '-'}</td>
+                            <td class="p-4 rounded-l-xl flex gap-2">
+                                <button onclick="openPointsModal(${u.id})" class="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="تعديل النقاط"><i class="fas fa-coins"></i></button>
+                                ${u.is_banned
+                            ? `<button onclick="toggleBan(${u.id}, 'unban')" class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100" title="فك الحظر"><i class="fas fa-unlock"></i></button>`
+                            : `<button onclick="toggleBan(${u.id}, 'ban')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="حظر"><i class="fas fa-ban"></i></button>`
+                        }
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        async function loadTasks() {
+            const data = await fetchAuth('/admin/tasks');
+            const tbody = document.querySelector('#tasks-table tbody');
+            tbody.innerHTML = '';
+
+            if (data && data.tasks) {
+                data.tasks.forEach(t => {
+                    const isAuto = t.task_type === 'auto' || !t.task_type;
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-4">
+                                <span class="px-2 py-1 rounded text-xs font-bold ${isAuto ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}">
+                                    ${isAuto ? 'تلقائي' : 'يدوي'}
+                                </span>
+                            </td>
+                            <td class="p-4 font-bold text-gray-800">${t.title}</td>
+                            <td class="p-4 font-bold text-secondary">+${t.reward_points}</td>
+                            <td class="p-4 text-xs text-gray-500 max-w-xs truncate">
+                                ${isAuto ? `Duration: ${t.duration_seconds}s` : 'Proof Image'}
+                            </td>
+                            <td class="p-4">
+                                <button onclick="deleteTask(${t.id})" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
             }
         }
 
@@ -566,129 +555,139 @@
 
             if (data && data.withdrawals) {
                 data.withdrawals.forEach(w => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${w.username}</td>
-                        <td style="color: var(--primary); font-weight:bold;">${w.amount_points}</td>
-                        <td>${w.method}</td>
-                        <td>${w.wallet_or_number}</td>
-                        <td><span class="status-badge status-${w.status}">${w.status}</span></td>
-                        <td>${new Date(w.created_at).toLocaleDateString()}</td>
-                        <td>
-                            ${w.status === 'pending' ? `
-                            <button class="btn btn-success" onclick="actionWithdrawal(${w.id}, 'approve')">✓</button>
-                            <button class="btn btn-danger" onclick="actionWithdrawal(${w.id}, 'reject')">✗</button>
-                            ` : '-'}
-                        </td>
+                    const statusColors = { pending: 'bg-amber-100 text-amber-700', approved: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700' };
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-4 font-bold">${w.username}</td>
+                            <td class="p-4 font-black text-gray-800">${w.amount_points}</td>
+                            <td class="p-4 text-xs">
+                                <div class="font-bold text-gray-700">${w.method}</div>
+                                <div class="text-gray-400 font-mono">${w.wallet_or_number}</div>
+                            </td>
+                            <td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${statusColors[w.status] || 'bg-gray-100'}">${w.status}</span></td>
+                            <td class="p-4 text-xs text-gray-400">${new Date(w.created_at).toLocaleDateString()}</td>
+                            <td class="p-4 flex gap-2">
+                                ${w.status === 'pending' ? `
+                                    <button onclick="actionWithdrawal(${w.id}, 'approve')" class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100"><i class="fas fa-check"></i></button>
+                                    <button onclick="actionWithdrawal(${w.id}, 'reject')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><i class="fas fa-times"></i></button>
+                                ` : '<span class="text-gray-300">-</span>'}
+                            </td>
+                        </tr>
                     `;
-                    tbody.appendChild(tr);
                 });
             }
         }
 
-        async function loadTasks() {
-            // Using /tasks/ads temporarily.
-            // Ideally should be /admin/tasks to seeing all tasks.
-            const tbody = document.querySelector('#tasks-table tbody');
-            tbody.innerHTML = '';
+        async function loadProofs() {
+            const data = await fetchAuth('/admin/manual-tasks/pending');
+            const container = document.getElementById('proofs-container');
+            const empty = document.getElementById('no-proofs');
 
-            const res = await fetchAuth('/tasks/ads');
-            if (res && res.tasks) {
-                res.tasks.forEach(t => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${t.title}</td>
-                        <td>${t.reward_points}</td>
-                        <td>${t.duration_seconds}</td>
-                        <td><span class="status-badge status-approved">Active</span></td>
-                        <td>
-                            <button class="btn btn-danger" onclick="deleteTask(${t.id})">حذف</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+            container.innerHTML = '';
+
+            if (!data.proofs || data.proofs.length === 0) {
+                empty.classList.remove('hidden');
+                return;
             }
-        }
+            empty.classList.add('hidden');
 
-        async function loadUsers() {
-            const data = await fetchAuth('/admin/users');
-            const tbody = document.querySelector('#users-table tbody');
-            tbody.innerHTML = '';
-
-            if (data && data.users) {
-                data.users.forEach(u => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${u.id}</td>
-                        <td>${u.username}</td>
-                        <td>${u.email}</td>
-                        <td>${u.points}</td>
-                        <td>${u.is_banned ? '<span style="color:var(--danger)">محظور</span>' : 'نشط'}</td>
-                        <td>
-                            ${u.is_banned ?
-                            `<button class="btn btn-success" onclick="toggleBan(${u.id}, 'unban')">فك حظر</button>` :
-                            `<button class="btn btn-danger" onclick="toggleBan(${u.id}, 'ban')">حظر</button>`
-                        }
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
-        }
-
-        // --- Actions ---
-
-        async function actionWithdrawal(id, action) {
-            if (!confirm('هل أنت متأكد؟')) return;
-            const res = await fetchAuth(`/admin/withdrawals/${id}/action`, {
-                method: 'POST',
-                body: JSON.stringify({ action })
+            data.proofs.forEach(p => {
+                container.innerHTML += `
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                        <div class="flex items-center justify-between pb-2 border-b border-gray-50">
+                            <div>
+                                <p class="font-bold text-sm text-gray-800">${p.username}</p>
+                                <p class="text-xs text-gray-400">Task: ${p.task_title}</p>
+                            </div>
+                            <span class="font-black text-secondary text-lg">+${p.reward_points}</span>
+                        </div>
+                        <div class="aspect-video rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                            <a href="${p.image_url}" target="_blank">
+                                <img src="${p.image_url}" class="w-full h-full object-cover hover:scale-105 transition duration-500 cursor-zoom-in">
+                            </a>
+                        </div>
+                        <div class="flex gap-2 mt-auto pt-2">
+                            <button onclick="actionProof(${p.id}, 'approve')" class="flex-1 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 shadow transition">قبول</button>
+                            <button onclick="actionProof(${p.id}, 'reject')" class="flex-1 py-2 bg-red-100 text-red-600 rounded-lg font-bold hover:bg-red-200 transition">رفض</button>
+                        </div>
+                    </div>
+                `;
             });
-            if (res.status === 'success') loadWithdrawals();
-            else alert(res.message);
         }
 
-        async function toggleBan(id, action) {
-            if (!confirm('هل أنت متأكد؟')) return;
-            const res = await fetchAuth(`/admin/users/${id}/${action}`, { method: 'POST' });
-            if (res.status === 'success') loadUsers();
-            else alert(res.message);
+        /* --- ACTIONS --- */
+        async function toggleTaskFields() {
+            const type = document.getElementById('new-task-type').value;
+            if (type === 'manual') {
+                document.getElementById('field-auto-url').classList.add('hidden');
+                document.getElementById('field-auto-duration').classList.add('hidden');
+            } else {
+                document.getElementById('field-auto-url').classList.remove('hidden');
+                document.getElementById('field-auto-duration').classList.remove('hidden');
+            }
+        }
+        function openTaskModal() { document.getElementById('task-modal').classList.remove('hidden'); }
+
+        async function createTask() {
+            const body = {
+                task_type: document.getElementById('new-task-type').value,
+                title: document.getElementById('new-task-title').value,
+                description: document.getElementById('new-task-desc').value,
+                reward_points: document.getElementById('new-task-points').value,
+                duration_seconds: document.getElementById('new-task-duration').value,
+                ad_url: document.getElementById('new-task-url').value,
+            };
+
+            const res = await fetchAuth('/admin/add-task', { method: 'POST', body: JSON.stringify(body) });
+            if (res.status === 'success') {
+                document.getElementById('task-modal').classList.add('hidden');
+                loadTasks();
+            } else alert(res.message);
         }
 
         async function deleteTask(id) {
-            if (!confirm('هل تريد حذف هذه المهمة؟')) return;
-            const res = await fetchAuth(`/admin/delete-task/${id}`, { method: 'DELETE' });
-            if (res.status === 'success') loadTasks();
-            else alert(res.message);
+            if (!confirm('حذف المهمة؟')) return;
+            await fetchAuth(`/admin/delete-task/${id}`, { method: 'DELETE' });
+            loadTasks();
         }
 
-        function openAddTaskModal() {
-            document.getElementById('task-modal').classList.add('active');
+        /* USER ACTIONS */
+        function openPointsModal(uid) {
+            document.getElementById('edit-user-id').value = uid;
+            document.getElementById('points-modal').classList.remove('hidden');
         }
+        async function submitPointEdit() {
+            const uid = document.getElementById('edit-user-id').value;
+            const points = document.getElementById('edit-points-val').value;
+            const reason = document.getElementById('edit-points-reason').value;
 
-        async function createTask() {
-            const title = document.getElementById('task-title').value;
-            const points = document.getElementById('task-points').value;
-            const duration = document.getElementById('task-duration').value;
-            const url = document.getElementById('task-url').value;
-
-            const res = await fetchAuth('/admin/add-task', {
-                method: 'POST',
-                body: JSON.stringify({
-                    title,
-                    reward_points: points,
-                    duration_seconds: duration,
-                    ad_url: url,
-                    description: 'Admin created'
-                })
+            const res = await fetchAuth(`/admin/users/${uid}/points`, {
+                method: 'POST', body: JSON.stringify({ points, reason })
             });
-
             if (res.status === 'success') {
-                document.getElementById('task-modal').classList.remove('active');
-                loadTasks();
-            } else {
-                alert(res.message);
-            }
+                document.getElementById('points-modal').classList.add('hidden');
+                loadUsers();
+            } else alert(res.message);
+        }
+        async function toggleBan(id, action) {
+            if (!confirm('تأكيد الإجراء؟')) return;
+            await fetchAuth(`/admin/users/${id}/${action}`, { method: 'POST' });
+            loadUsers();
+        }
+
+        /* MANAGERS */
+        async function actionWithdrawal(id, action) {
+            if (!confirm(action === 'approve' ? 'موافقة على السحب؟' : 'رفض السحب؟')) return;
+            await fetchAuth(`/admin/withdrawals/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) });
+            loadWithdrawals();
+            loadStats();
+        }
+
+        async function actionProof(id, action) {
+            if (!confirm(action === 'approve' ? 'قبول الإثبات ومنح النقاط؟' : 'رفض الإثبات؟')) return;
+            await fetchAuth(`/admin/manual-tasks/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) });
+            loadProofs();
+            loadStats();
         }
 
     </script>
