@@ -149,7 +149,8 @@
                         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
                             <div
                                 class="w-14 h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl">
-                                <i class="fas fa-users"></i></div>
+                                <i class="fas fa-users"></i>
+                            </div>
                             <div>
                                 <p class="text-sm text-gray-400 font-bold">إجمالي المستخدمين</p>
                                 <p class="text-2xl font-black text-gray-800" id="stat-users">0</p>
@@ -158,7 +159,8 @@
                         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
                             <div
                                 class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl">
-                                <i class="fas fa-check-circle"></i></div>
+                                <i class="fas fa-check-circle"></i>
+                            </div>
                             <div>
                                 <p class="text-sm text-gray-400 font-bold">مهام مكتملة</p>
                                 <p class="text-2xl font-black text-gray-800" id="stat-points">0</p>
@@ -168,7 +170,8 @@
                         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
                             <div
                                 class="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-2xl">
-                                <i class="fas fa-clock"></i></div>
+                                <i class="fas fa-clock"></i>
+                            </div>
                             <div>
                                 <p class="text-sm text-gray-400 font-bold">سحوبات معلقة</p>
                                 <p class="text-2xl font-black text-gray-800" id="stat-withdrawals">0</p>
@@ -177,7 +180,8 @@
                         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
                             <div
                                 class="w-14 h-14 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center text-2xl">
-                                <i class="fas fa-file-image"></i></div>
+                                <i class="fas fa-file-image"></i>
+                            </div>
                             <div>
                                 <p class="text-sm text-gray-400 font-bold">إثباتات للمراجعة</p>
                                 <p class="text-2xl font-black text-gray-800" id="stat-proofs">0</p>
@@ -320,14 +324,14 @@
                 </div>
 
                 <!-- Variable Fields -->
-                <div id="field-auto-url">
-                    <label class="text-xs font-bold text-gray-500 uppercase">رابط الإعلان (Auto Only)</label>
+                <div id="field-url">
+                    <label class="text-xs font-bold text-gray-500 uppercase">رابط المهمة / الإعلان (مطلوب)</label>
                     <input type="text" id="new-task-url"
                         class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
                         placeholder="https://...">
                 </div>
-                <div id="field-auto-duration">
-                    <label class="text-xs font-bold text-gray-500 uppercase">مدة المشاهدة (ثواني)</label>
+                <div id="field-duration">
+                    <label class="text-xs font-bold text-gray-500 uppercase">المدة / الثواني (مطلوب)</label>
                     <input type="number" id="new-task-duration"
                         class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-primary mt-1"
                         value="30">
@@ -617,16 +621,22 @@
 
         /* --- ACTIONS --- */
         async function toggleTaskFields() {
+            // Always show all fields as requested by user
+            // But we can update labels or hints if needed
             const type = document.getElementById('new-task-type').value;
+            const urlLabel = document.querySelector('#field-url label');
+
             if (type === 'manual') {
-                document.getElementById('field-auto-url').classList.add('hidden');
-                document.getElementById('field-auto-duration').classList.add('hidden');
+                urlLabel.innerText = "رابط المهمة (مثل قناة تيليجرام)";
+                // document.getElementById('field-duration').classList.add('hidden'); // User said duration is required, so keep it
             } else {
-                document.getElementById('field-auto-url').classList.remove('hidden');
-                document.getElementById('field-auto-duration').classList.remove('hidden');
+                urlLabel.innerText = "رابط الإعلان (Auto Only)";
             }
         }
-        function openTaskModal() { document.getElementById('task-modal').classList.remove('hidden'); }
+        function openTaskModal() {
+            toggleTaskFields();
+            document.getElementById('task-modal').classList.remove('hidden');
+        }
 
         async function createTask() {
             const body = {
@@ -637,6 +647,12 @@
                 duration_seconds: document.getElementById('new-task-duration').value,
                 ad_url: document.getElementById('new-task-url').value,
             };
+
+            // VALIDATION
+            if (!body.title || !body.reward_points || !body.duration_seconds || !body.ad_url) {
+                alert('جميع الحقول مطلوبة (العنوان، النقاط، المدة، الرابط)');
+                return;
+            }
 
             const res = await fetchAuth('/admin/add-task', { method: 'POST', body: JSON.stringify(body) });
             if (res.status === 'success') {
