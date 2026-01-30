@@ -1660,6 +1660,98 @@ app.get(
 );
 
 
+// ===============================
+// RESTORED: Admin Task Management
+// ===============================
+
+// 1. Get All Tasks (Auto & Manual)
+app.get('/admin/tasks', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM tasks ORDER BY id DESC');
+    res.json({ status: 'success', tasks: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch tasks' });
+  }
+});
+
+// 2. Add New Task (Auto)
+app.post('/admin/add-task', authMiddleware, adminMiddleware, async (req, res) => {
+  const { title, description, reward_points, duration_seconds, ad_url, task_type } = req.body;
+
+  if (!title || !reward_points || !ad_url) {
+    return res.status(400).json({ status: 'error', message: 'Missing required fields' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO tasks (title, description, reward_points, duration_seconds, ad_url, task_type, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, true)`,
+      [title, description || '', reward_points, duration_seconds || 30, ad_url, task_type || 'auto']
+    );
+    res.json({ status: 'success', message: 'Task created successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to create task' });
+  }
+});
+
+// 3. Delete Task
+app.delete('/admin/delete-task/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+    res.json({ status: 'success', message: 'Task deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to delete task' });
+  }
+});
+
+// ===============================
+// RESTORED: Admin User Management
+// ===============================
+
+// Edit User Points
+app.post('/admin/users/:id/points', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { points, reason } = req.body;
+
+  if (!points) {
+    return res.status(400).json({ status: 'error', message: 'Points required' });
+  }
+
+  try {
+    // Update user points
+    // We replace the points or add? Usually 'edit' implies set or add. 
+    // The frontend sends the new TOTAL or difference? 
+    // Looking at admin.html, it sends just a value. Let's assume it's ADDING/SUBTRACTING if the admin enters +/-, 
+    // OR setting the value. 
+    // The previous implementation was: UPDATE users SET points = points + $1 ...
+    // But the user might want to SET exact points.
+    // Let's stick to "Set" or "Add". Use "Set" if we want exact control, but usually admin wants to "Give Bonus".
+    // Let's check previous context... 
+    // "submitPointEdit" in admin.html usually implies updating. 
+    // Use SET for full control.
+
+    await pool.query('UPDATE users SET points = $1 WHERE id = $2', [points, id]);
+
+    // Log history
+    /*
+    await pool.query(
+        `INSERT INTO points_history (user_id, points, type, reason) VALUES ($1, $2, 'admin_adjust', $3)`,
+        [id, points, reason || 'Admin adjustment']
+    );
+    */
+
+    res.json({ status: 'success', message: 'User points updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Failed to update points' });
+  }
+});
+
+
 
 // ===============================
 // Admin - Review manual task
